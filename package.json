@@ -1,7 +1,7 @@
 {
   "name": "chat-app-backend",
   "version": "1.0.0",
-  "main": "app.js",
+  "main": "server.js",
   "scripts": {
     "dev": "node --watch --env-file=.env src/server.js",
     "start": "node src/server.js"
