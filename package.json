@@ -1,10 +1,10 @@
 {
   "name": "chat-app-backend",
   "version": "1.0.0",
-  "main": "src/server.js",
+  "main": "server.js",
   "scripts": {
-    "dev": "node --watch --env-file=.env src/server.js",
-    "start": "node src/server.js"
+    "dev": "node --watch --env-file=.env server.js",
+    "start": "node server.js"
   },
   "keywords": [],
   "type": "module",

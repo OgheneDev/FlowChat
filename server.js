@@ -3,13 +3,13 @@ import cors from 'cors'
 import path from 'path';
 import cookieParser from 'cookie-parser';
 
-import { connectDB } from './lib/db.js';
-import { authRouter } from './routes/auth.route.js';
-import { messagesRouter } from './routes/messages.routes.js';
-import { groupRouter } from './routes/group.routes.js'
-import { chatRouter } from './routes/chat.routes.js';
-import { searchRouter } from './routes/search.routes.js';
-import { server, app } from './lib/socket.js';
+import { connectDB } from './src/lib/db.js';
+import { authRouter } from './src/routes/auth.route.js';
+import { messagesRouter } from './src/routes/messages.routes.js';
+import { groupRouter } from './src/routes/group.routes.js'
+import { chatRouter } from './src/routes/chat.routes.js';
+import { searchRouter } from './src/routes/search.routes.js';
+import { server, app } from './src/lib/socket.js';
 
 const _dirname = path.resolve();
 
