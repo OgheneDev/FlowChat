@@ -9,7 +9,7 @@ import { messagesRouter } from './src/routes/messages.routes.js';
 import { groupRouter } from './src/routes/group.routes.js'
 import { chatRouter } from './src/routes/chat.routes.js';
 import { searchRouter } from './src/routes/search.routes.js';
-import { server, app } from './src/lib/socket.js';
+import { server, app } from './src/lib/socket.js'; 
 
 const _dirname = path.resolve();
 
