@@ -23,7 +23,7 @@ const options = {
       },
     },
   },
-  apis: ["./routes/*.js"], // Path to your route files
+  apis: ["./src/routes/*.js", "./src/routes/**/*.js", "./server.js"],
 };
 
 export const swaggerSpec = swaggerJSDoc(options);
