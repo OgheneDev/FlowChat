@@ -3,7 +3,7 @@ import cors from "cors";
 import path from "path";
 import cookieParser from "cookie-parser";
 import { connectDB } from "./src/lib/db.js";
-import { authRouter } from "./routes/auth.route.js";
+import { authRouter } from "./routes/auth.routes.js";
 import { messagesRouter } from "./routes/messages.routes.js";
 import { groupRouter } from "./routes/group.routes.js";
 import { chatRouter } from "./routes/chat.routes.js";
