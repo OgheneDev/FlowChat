@@ -136,6 +136,9 @@ export const sendMessage = async (req, res) => {
 
 export const getChatPartners = async (req, res) => {
   try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
     const loggedInUserId = req.user._id;
 
     const messages = await Message.find({
@@ -152,6 +155,10 @@ export const getChatPartners = async (req, res) => {
       ),
     ];
 
+    if (chatPartnerIds.length === 0) {
+      return res.status(200).json([]);
+    }
+
     const chatPartners = await User.find(
       { _id: { $in: chatPartnerIds } },
       "fullName email online lastSeen profilePicture"
@@ -159,8 +166,8 @@ export const getChatPartners = async (req, res) => {
 
     res.status(200).json(chatPartners);
   } catch (error) {
-    console.error("Error in getChatPartners:", error.message);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("Error in getChatPartners:", error);
+    res.status(500).json({ error: "Internal server error", details: error.message });
   }
 };
 

@@ -12,7 +12,7 @@ import { searchRouter } from "./src/routes/search.routes.js";
 import { server, app } from "./src/lib/socket.js";
 
 const __dirname = path.resolve();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
 // ✅ Body parsers (must come before routes)
 app.use(express.json());
