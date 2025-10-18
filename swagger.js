@@ -21,9 +21,30 @@ const options = {
           bearerFormat: "JWT",
         },
       },
+      schemas: {
+        User: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            fullName: { type: "string" },
+            email: { type: "string", format: "email" },
+            profilePic: { type: "string", nullable: true },
+          },
+        },
+        Error: {
+          type: "object",
+          properties: {
+            message: { type: "string" },
+            errors: {
+              type: "array",
+              items: { type: "string" },
+            },
+          },
+        },
+      },
     },
   },
-  apis: ["./src/routes/*.js", "./src/routes/**/*.js", "./server.js"],
+  apis: ["./src/routes/*.js", "./src/routes/**/*.js"],
 };
 
 export const swaggerSpec = swaggerJSDoc(options);
