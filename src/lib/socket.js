@@ -183,6 +183,12 @@ io.on("connection", async (socket) => {
           status: "delivered",
         });
         log("📩", `${userName} sent a message (delivered)`);
+
+        // emit quick recent-chat update to receiver and sender
+        io.to(receiverSocketId).emit("recentChatUpdated", {
+          partnerId: userId, // for receiver, partner is sender
+          lastMessage: { ...populatedMessage, status: "delivered" },
+        });
       } else {
         io.to(socket.id).emit("messageStatusUpdate", {
           messageId: newMessage._id,
@@ -190,6 +196,15 @@ io.on("connection", async (socket) => {
         });
         log("📤", `${userName} sent a message (user offline)`);
       }
+
+      // emit quick recent-chat update to sender (current socket)
+      io.to(socket.id).emit("recentChatUpdated", {
+        partnerId: receiverId,
+        lastMessage: {
+          ...populatedMessage,
+          status: receiverSocketId ? "delivered" : "sent",
+        },
+      });
 
       io.to(socket.id).emit("newMessage", populatedMessage);
     } catch (error) {
@@ -424,6 +439,12 @@ io.on("connection", async (socket) => {
         ...populatedMessage,
         groupId,
         status: "sent",
+      });
+
+      // quick update for group recent list (clients should listen to this)
+      io.to(`group:${groupId}`).emit("recentGroupUpdated", {
+        groupId,
+        lastMessage: { ...populatedMessage, groupId },
       });
     } catch (error) {
       log("❌", "Error sending group message", error);

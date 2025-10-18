@@ -159,12 +159,10 @@ export const getChatPartners = async (req, res) => {
       ...new Set(
         messages
           .filter((msg) => {
-            // Ensure senderId exists and is valid
             if (!msg.senderId || !mongoose.Types.ObjectId.isValid(msg.senderId)) {
               console.warn("getChatPartners: Invalid or missing senderId in message", msg._id, msg.senderId);
               return false;
             }
-            // Check receiverId only if it exists (optional for group messages)
             if (msg.receiverId && !mongoose.Types.ObjectId.isValid(msg.receiverId)) {
               console.warn("getChatPartners: Invalid receiverId in message", msg._id, msg.receiverId);
               return false;
@@ -173,10 +171,10 @@ export const getChatPartners = async (req, res) => {
           })
           .map((msg) =>
             msg.senderId.toString() === loggedInUserId.toString()
-              ? msg.receiverId?.toString() // Handle optional receiverId
+              ? msg.receiverId?.toString()
               : msg.senderId.toString()
           )
-          .filter((id) => id) // Remove undefined/null IDs (e.g., from group messages without receiverId)
+          .filter((id) => id)
       ),
     ];
 
@@ -191,8 +189,34 @@ export const getChatPartners = async (req, res) => {
       "fullName email online lastSeen profilePicture"
     ).lean();
 
-    console.log("getChatPartners: Chat partners found", chatPartners.length);
-    res.status(200).json(chatPartners);
+    // Attach last message between loggedInUserId and each partner
+    const chatPartnersWithLast = await Promise.all(
+      chatPartners.map(async (partner) => {
+        const lastMessage = await Message.findOne({
+          $or: [
+            { senderId: loggedInUserId, receiverId: partner._id },
+            { senderId: partner._id, receiverId: loggedInUserId },
+          ],
+        })
+          .populate("senderId", "fullName profileImage")
+          .populate("receiverId", "fullName profileImage")
+          .populate({
+            path: "replyTo",
+            select: "text image senderId",
+            populate: { path: "senderId", select: "fullName profileImage" },
+          })
+          .sort({ createdAt: -1 })
+          .lean();
+
+        return {
+          ...partner,
+          lastMessage: lastMessage || null,
+        };
+      })
+    );
+
+    console.log("getChatPartners: Chat partners with last messages", chatPartnersWithLast.length);
+    res.status(200).json(chatPartnersWithLast);
   } catch (error) {
     console.error("Error in getChatPartners:", error.stack);
     res.status(500).json({ error: "Internal server error", details: error.message });
