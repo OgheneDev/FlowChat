@@ -1,12 +1,67 @@
 /**
  * @swagger
+ * components:
+ *   schemas:
+ *     User:
+ *       type: object
+ *       properties:
+ *         _id:
+ *           type: string
+ *           description: User ID
+ *         email:
+ *           type: string
+ *           format: email
+ *         fullName:
+ *           type: string
+ *         profilePic:
+ *           type: string
+ *           default: ""
+ *         online:
+ *           type: boolean
+ *           default: false
+ *         lastSeen:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
+ *         starredMessages:
+ *           type: array
+ *           items:
+ *             type: string
+ *             description: Message IDs
+ *         starredChats:
+ *           type: array
+ *           items:
+ *             type: string
+ *             description: Chat IDs
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *     Error:
+ *       type: object
+ *       properties:
+ *         message:
+ *           type: string
+ *         error:
+ *           type: string
+ *         stack:
+ *           type: string
+ *   securitySchemes:
+ *     bearerAuth:
+ *       type: http
+ *       scheme: bearer
+ *       bearerFormat: JWT
+ *
+ * @swagger
  * tags:
  *   - name: Auth
  *     description: General Auth Operations
  */
 
 /**
- * @openapi
+ * @swagger
  * /api/auth/signup:
  *   post:
  *     tags:
@@ -46,6 +101,7 @@
  *             schema:
  *               $ref: '#/components/schemas/Error'
  *
+ * @swagger
  * /api/auth/login:
  *   post:
  *     tags:
@@ -79,6 +135,7 @@
  *       500:
  *         description: Server error
  *
+ * @swagger
  * /api/auth/logout:
  *   post:
  *     tags:
@@ -93,6 +150,7 @@
  *       400:
  *         description: Bad request
  *
+ * @swagger
  * /api/auth/update-profile:
  *   put:
  *     tags:
@@ -121,6 +179,7 @@
  *       400:
  *         description: Validation or upload error
  *
+ * @swagger
  * /api/auth/check:
  *   get:
  *     tags:
@@ -139,6 +198,7 @@
  *       401:
  *         description: Not authenticated
  *
+ * @swagger
  * /api/auth/forgot-password:
  *   post:
  *     tags:
@@ -163,6 +223,7 @@
  *       404:
  *         description: User not found
  *
+ * @swagger
  * /api/auth/reset-password/{resetToken}:
  *   put:
  *     tags:
