@@ -137,6 +137,7 @@ export const sendMessage = async (req, res) => {
 
 export const getChatPartners = async (req, res) => {
   try {
+    console.log("getChatPartners: Request received for user", req.user?._id);
     if (!req.user || !req.user._id) {
       console.log("getChatPartners: Unauthorized, no user in request");
       return res.status(401).json({ error: "Unauthorized" });
@@ -148,31 +149,40 @@ export const getChatPartners = async (req, res) => {
       return res.status(400).json({ error: "Invalid user ID" });
     }
 
+    console.log("getChatPartners: Querying messages for", loggedInUserId);
     const messages = await Message.find({
       $or: [{ senderId: loggedInUserId }, { receiverId: loggedInUserId }],
     }).lean();
 
+    console.log("getChatPartners: Messages fetched", messages.length);
     const chatPartnerIds = [
       ...new Set(
         messages
           .filter((msg) => {
-            const senderId = msg.senderId?.toString();
-            const receiverId = msg.receiverId?.toString();
-            if (!mongoose.Types.ObjectId.isValid(senderId) || !mongoose.Types.ObjectId.isValid(receiverId)) {
-              console.warn("getChatPartners: Invalid ObjectId in message", msg._id);
+            // Ensure senderId exists and is valid
+            if (!msg.senderId || !mongoose.Types.ObjectId.isValid(msg.senderId)) {
+              console.warn("getChatPartners: Invalid or missing senderId in message", msg._id, msg.senderId);
+              return false;
+            }
+            // Check receiverId only if it exists (optional for group messages)
+            if (msg.receiverId && !mongoose.Types.ObjectId.isValid(msg.receiverId)) {
+              console.warn("getChatPartners: Invalid receiverId in message", msg._id, msg.receiverId);
               return false;
             }
             return true;
           })
           .map((msg) =>
             msg.senderId.toString() === loggedInUserId.toString()
-              ? msg.receiverId.toString()
+              ? msg.receiverId?.toString() // Handle optional receiverId
               : msg.senderId.toString()
           )
+          .filter((id) => id) // Remove undefined/null IDs (e.g., from group messages without receiverId)
       ),
     ];
 
+    console.log("getChatPartners: Chat partner IDs", chatPartnerIds);
     if (chatPartnerIds.length === 0) {
+      console.log("getChatPartners: No chat partners found");
       return res.status(200).json([]);
     }
 
@@ -181,9 +191,10 @@ export const getChatPartners = async (req, res) => {
       "fullName email online lastSeen profilePicture"
     ).lean();
 
+    console.log("getChatPartners: Chat partners found", chatPartners.length);
     res.status(200).json(chatPartners);
   } catch (error) {
-    console.error("Error in getChatPartners:", error);
+    console.error("Error in getChatPartners:", error.stack);
     res.status(500).json({ error: "Internal server error", details: error.message });
   }
 };
