@@ -4,8 +4,8 @@ import {
   unpinMessage,
   toggleStarMessage,
   toggleStarChat,
-} from "../controllers/chat.controller.js";
-import { protect } from "../middleware/auth.middleware.js";
+} from "../src/controllers/chat.controller.js";
+import { protect } from "../src/middleware/auth.middleware.js";
 
 const router = express.Router();
 

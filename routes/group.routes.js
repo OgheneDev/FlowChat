@@ -10,8 +10,8 @@ import {
   addMembersToGroup, 
   removeMemberFromGroup, 
   leaveGroup 
-} from "../controllers/group.controller.js"; // Adjust path as needed
-import { protect } from "../middleware/auth.middleware.js"; // Your auth middleware
+} from "../src/controllers/group.controller.js"; // Adjust path as needed
+import { protect } from "../src/middleware/auth.middleware.js"; // Your auth middleware
 
 const router = express.Router();
 

@@ -1,7 +1,7 @@
 import express from 'express'
 const router = express.Router();
-import { getAllContacts, getChatPartners, getMessagesByUserId, sendMessage, deleteMessage, editMessage } from '../controllers/message.controller.js';
-import { protect } from '../middleware/auth.middleware.js';
+import { getAllContacts, getChatPartners, getMessagesByUserId, sendMessage, deleteMessage, editMessage } from '../src/controllers/message.controller.js';
+import { protect } from '../src/middleware/auth.middleware.js';
 
 router.use(protect);
 
