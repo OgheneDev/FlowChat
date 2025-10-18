@@ -1,4 +1,6 @@
+// filepath: c:\Users\HomePC\Documents\Projects\Backend\chat-app-backend\swagger.js
 import swaggerJSDoc from "swagger-jsdoc";
+import path from "path";
 
 const options = {
   definition: {
@@ -44,7 +46,10 @@ const options = {
       },
     },
   },
-  apis: ["src/routes/*.js", "src/routes/**/*.js"],
+  apis: [
+    path.resolve("src/routes/*.js"),
+    path.resolve("src/routes/**/*.js"),
+  ],
 };
 
 export const swaggerSpec = swaggerJSDoc(options);
