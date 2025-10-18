@@ -1,8 +1,8 @@
 import express from "express";
 const router = express.Router();
 import { check } from "express-validator";
-import { signup, login, logout, updateProfile, forgotPassword, resetPassword } from "../controllers/auth.controller.js";
-import { protect } from "../middleware/auth.middleware.js";
+import { signup, login, logout, updateProfile, forgotPassword, resetPassword } from "../src/controllers/auth.controller.js";
+import { protect } from "../src/middleware/auth.middleware.js";
 
 /**
  * @openapi
