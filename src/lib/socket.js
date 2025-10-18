@@ -15,30 +15,19 @@ const io = new Server(server, {
   cors: {
     origin: [
       process.env.CLIENT_URL,
-      "http://localhost:3000", // Allow local development
-      ...(process.env.NODE_ENV === "production" ? [] : ["http://localhost:5173"]), // Add other dev origins if needed
-    ].filter(Boolean), // Remove undefined values
+      "http://localhost:3000",
+      "https://flowchat.vercel.app",
+    ].filter(Boolean),
     methods: ["GET", "POST"],
     credentials: true,
   },
-  pingTimeout: 60000, // Increase timeout for Render.com
+  path: "/socket.io",
+  transports: ["websocket", "polling"],
+  pingTimeout: 60000,
   pingInterval: 25000,
 });
 
-// Validate environment variables
-if (!process.env.CLIENT_URL) {
-  console.error("❌ Missing CLIENT_URL environment variable");
-  process.exit(1);
-}
-
-io.use((socket, next) => {
-  try {
-    socketAuthMiddleware(socket, next);
-  } catch (error) {
-    console.error("⚠️ Socket authentication error:", error.message);
-    next(new Error("Authentication failed"));
-  }
-});
+io.use(socketAuthMiddleware);
 
 const userSocketMap = {}; // { userId: socketId }
 const activeSearches = {}; // { userId: query }

@@ -2,6 +2,7 @@ import cloudinary from '../lib/cloudinary.js';
 import Message from '../models/Message.js'
 import Group from '../models/Group.js';
 import User from '../models/User.js';
+import mongoose from 'mongoose';
 
 export const getAllContacts = async (req, res) => {
   try {
@@ -137,21 +138,37 @@ export const sendMessage = async (req, res) => {
 export const getChatPartners = async (req, res) => {
   try {
     if (!req.user || !req.user._id) {
+      console.log("getChatPartners: Unauthorized, no user in request");
       return res.status(401).json({ error: "Unauthorized" });
     }
     const loggedInUserId = req.user._id;
 
+    if (!mongoose.Types.ObjectId.isValid(loggedInUserId)) {
+      console.log("getChatPartners: Invalid user ID", loggedInUserId);
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
     const messages = await Message.find({
       $or: [{ senderId: loggedInUserId }, { receiverId: loggedInUserId }],
-    });
+    }).lean();
 
     const chatPartnerIds = [
       ...new Set(
-        messages.map((msg) =>
-          msg.senderId.toString() === loggedInUserId.toString()
-            ? msg.receiverId.toString()
-            : msg.senderId.toString()
-        )
+        messages
+          .filter((msg) => {
+            const senderId = msg.senderId?.toString();
+            const receiverId = msg.receiverId?.toString();
+            if (!mongoose.Types.ObjectId.isValid(senderId) || !mongoose.Types.ObjectId.isValid(receiverId)) {
+              console.warn("getChatPartners: Invalid ObjectId in message", msg._id);
+              return false;
+            }
+            return true;
+          })
+          .map((msg) =>
+            msg.senderId.toString() === loggedInUserId.toString()
+              ? msg.receiverId.toString()
+              : msg.senderId.toString()
+          )
       ),
     ];
 
@@ -162,7 +179,7 @@ export const getChatPartners = async (req, res) => {
     const chatPartners = await User.find(
       { _id: { $in: chatPartnerIds } },
       "fullName email online lastSeen profilePicture"
-    );
+    ).lean();
 
     res.status(200).json(chatPartners);
   } catch (error) {
