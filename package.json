@@ -22,7 +22,9 @@
     "nodemailer": "^7.0.9",
     "path": "^0.12.7",
     "resend": "^6.1.2",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "swagger-jsdoc": "^3.7.0",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6"

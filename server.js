@@ -9,6 +9,8 @@ import { groupRouter } from "./src/routes/group.routes.js";
 import { chatRouter } from "./src/routes/chat.routes.js";
 import { searchRouter } from "./src/routes/search.routes.js";
 import { server, app } from "./src/lib/socket.js";
+import { swaggerSpec } from "./swagger.js";
+import swaggerUi from "swagger-ui-express";
 
 const __dirname = path.resolve();
 const PORT = process.env.PORT || 5000;
@@ -53,6 +55,12 @@ connectDB().then(() => {
   app.use("/api/chats", chatRouter);
   app.use("/api/search", searchRouter);
 
+  // Swagger route
+  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  
+  // Redirect root to Swagger UI
+  app.get('/', (req, res) => res.redirect('/api-docs'));
+  
   // Start server
   server.listen(PORT, () => {
     console.log(`✅ Server is running on port ${PORT}`);
