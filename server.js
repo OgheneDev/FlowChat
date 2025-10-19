@@ -27,7 +27,7 @@ connectDB().then(() => {
   // CORS
   const allowedOrigins = [
     "http://localhost:3000",
-    "https://flowchat.vercel.app",
+    "https://flowchat-three.vercel.app",
   ];
 
   app.use(
