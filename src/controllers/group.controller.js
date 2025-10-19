@@ -76,15 +76,42 @@ export const getMyGroups = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    // Find all groups where user is a member or admin
+    // Fetch groups as plain objects so we can attach lastMessage
     const groups = await Group.find({
       members: userId, // because admins are also in members
     })
       .populate("admins", "fullName profileImage email")
       .populate("members", "fullName profileImage email")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    res.status(200).json(groups);
+    // Attach lastMessage for each group
+    const groupsWithLast = await Promise.all(
+      groups.map(async (group) => {
+        const lastMessage = await Message.findOne({ groupId: group._id })
+          .populate("senderId", "fullName profileImage email")
+          .populate({
+            path: "replyTo",
+            select: "text image senderId createdAt",
+            populate: { path: "senderId", select: "fullName profileImage" },
+          })
+          .sort({ createdAt: -1 })
+          .lean();
+
+        // If last message was deleted for everyone, normalize display (optional)
+        if (lastMessage && lastMessage.deletedForEveryone) {
+          lastMessage.text = "This message was deleted";
+          lastMessage.image = null;
+        }
+
+        return {
+          ...group,
+          lastMessage: lastMessage || null,
+        };
+      })
+    );
+
+    res.status(200).json(groupsWithLast);
   } catch (error) {
     console.error("Error in getMyGroups:", error);
     res.status(500).json({ message: "Server error" });
