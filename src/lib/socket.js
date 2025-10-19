@@ -495,4 +495,4 @@ io.on("connection", async (socket) => {
   });
 });
 
-export { io, app, server };
+export { io, app, server, userSocketMap };

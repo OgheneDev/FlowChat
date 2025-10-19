@@ -3,6 +3,7 @@ import Message from '../models/Message.js'
 import Group from '../models/Group.js';
 import User from '../models/User.js';
 import mongoose from 'mongoose';
+import { io, userSocketMap } from '../lib/socket.js';
 
 export const getAllContacts = async (req, res) => {
   try {
@@ -82,56 +83,103 @@ export const sendMessage = async (req, res) => {
     const senderId = req.user._id;
 
     if (!text && !image) {
-      return res.status(400).json({ message: "Message text or image is required" });
+      return res.status(400).json({ message: 'Message text or image is required' });
+    }
+
+    // Verify receiver exists
+    const receiver = await User.findById(receiverId);
+    if (!receiver) {
+      return res.status(404).json({ message: 'Receiver not found' });
     }
 
     let imageUrl;
     if (image) {
-      const uploadResponse = await cloudinary.uploader.upload(image);
+      const uploadResponse = await cloudinary.uploader.upload(image, {
+        folder: 'chat/messages',
+      });
       imageUrl = uploadResponse.secure_url;
+      console.log(`[${new Date().toLocaleTimeString()}] ☁️ Image uploaded to Cloudinary`, { url: imageUrl });
     }
 
-    // ✅ Optional: verify the replied-to message exists
     let replyMessage = null;
     if (replyTo) {
-      replyMessage = await Message.findById(replyTo).select("text image senderId");
+      replyMessage = await Message.findById(replyTo)
+        .select('text image senderId')
+        .populate('senderId', 'fullName profileImage');
       if (!replyMessage) {
-        return res.status(400).json({ message: "Invalid reply message ID" });
+        return res.status(400).json({ message: 'Invalid reply message ID' });
       }
     }
 
-    // ✅ Create new message (with replyTo if present)
     const newMessage = new Message({
       senderId,
       receiverId,
       text,
       image: imageUrl,
+      status: 'sent',
       replyTo: replyMessage ? replyMessage._id : null,
     });
 
     await newMessage.save();
 
-    // ✅ FIX: Use findById to get a query that supports populate
     const populatedMessage = await Message.findById(newMessage._id)
-      .populate("senderId", "fullName profileImage")
-      .populate("receiverId", "fullName profileImage")
+      .populate('senderId', 'fullName profileImage')
+      .populate('receiverId', 'fullName profileImage')
       .populate({
-        path: "replyTo",
-        select: "text image senderId",
-        populate: { 
-          path: "senderId", 
-          select: "fullName profileImage" 
-        },
-      });
+        path: 'replyTo',
+        select: 'text image senderId',
+        populate: { path: 'senderId', select: 'fullName profileImage' },
+      })
+      .lean(); // Use .lean() to match socket.js behavior
 
     if (!populatedMessage) {
-      return res.status(404).json({ message: "Message not found after population" });
+      return res.status(404).json({ message: 'Message not found after population' });
     }
+
+    // Emit WebSocket events
+    const receiverSocketId = userSocketMap[receiverId];
+    const senderSocketId = userSocketMap[senderId];
+
+    if (receiverSocketId) {
+      await Message.findByIdAndUpdate(newMessage._id, { status: 'delivered' });
+      io.to(receiverSocketId).emit('newMessage', {
+        ...populatedMessage,
+        status: 'delivered',
+      });
+      io.to(senderSocketId).emit('messageStatusUpdate', {
+        messageId: newMessage._id,
+        status: 'delivered',
+      });
+      console.log(`[${new Date().toLocaleTimeString()}] 📩 Message sent (delivered)`);
+
+      // Emit recentChatUpdated to receiver
+      io.to(receiverSocketId).emit('recentChatUpdated', {
+        partnerId: senderId,
+        lastMessage: { ...populatedMessage, status: 'delivered' },
+      });
+    } else {
+      io.to(senderSocketId).emit('messageStatusUpdate', {
+        messageId: newMessage._id,
+        status: 'sent',
+      });
+      console.log(`[${new Date().toLocaleTimeString()}] 📤 Message sent (user offline)`);
+    }
+
+    // Emit recentChatUpdated to sender
+    io.to(senderSocketId).emit('recentChatUpdated', {
+      partnerId: receiverId,
+      lastMessage: {
+        ...populatedMessage,
+        status: receiverSocketId ? 'delivered' : 'sent',
+      },
+    });
+
+    io.to(senderSocketId).emit('newMessage', populatedMessage);
 
     res.status(201).json(populatedMessage);
   } catch (error) {
-    console.log("Error in sendMessage:", error);
-    res.status(500).json({ message: "Server error" });
+    console.log(`[${new Date().toLocaleTimeString()}] ❌ Error in sendMessage:`, error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
