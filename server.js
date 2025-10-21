@@ -17,9 +17,9 @@ const PORT = process.env.PORT || 5000;
 
 // Connect to MongoDB before starting the server
 connectDB().then(() => {
-  // Body parsers
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  // Body parsers  ←←←  ADD THE LIMITS HERE
+app.use(express.json({ limit: "10mb" }));                 // <-- JSON (base-64 images)
+app.use(express.urlencoded({ limit: "10mb", extended: true })); // <-- form-urlencoded
 
   // Cookies
   app.use(cookieParser());
