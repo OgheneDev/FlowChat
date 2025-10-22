@@ -234,7 +234,7 @@ export const getChatPartners = async (req, res) => {
 
     const chatPartners = await User.find(
       { _id: { $in: chatPartnerIds } },
-      "fullName email online lastSeen profilePicture"
+      "fullName email online lastSeen profilePic"
     ).lean();
 
     // Attach last message between loggedInUserId and each partner
