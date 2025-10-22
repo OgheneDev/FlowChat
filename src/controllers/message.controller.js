@@ -12,7 +12,7 @@ export const getAllContacts = async (req, res) => {
     // Fetch all users except the logged-in one
     const filteredUsers = await User.find(
       { _id: { $ne: loggedInUserId } },
-      "fullName email online lastSeen profilePicture" // pick needed fields
+      "fullName email online lastSeen profilePic" // pick needed fields
     );
 
     res.status(200).json(filteredUsers);
