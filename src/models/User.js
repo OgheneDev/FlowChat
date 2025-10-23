@@ -41,15 +41,14 @@ const userSchema = new mongoose.Schema(
       },
     ],
     // Chats (1-on-1 or group) the user has starred
-    // We use Mixed to allow both User _id and Group _id
-    // In your User model, change starredChats to:
-starredChats: [
-  {
-    type: mongoose.Schema.Types.ObjectId,
-    // No ref since it can be either User or Group
-    // We'll handle the type logic in the application
-  },
-],
+    // Simple array of ObjectIds (can be either User or Group IDs)
+    starredChats: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        // No ref since it can be either User or Group
+        // We'll handle the type logic in the application
+      },
+    ],
     pinnedMessages: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -65,23 +64,13 @@ starredChats: [
 // Text search index
 userSchema.index({ fullName: "text", email: "text" });
 
-// Ensure only one of chatPartnerId or groupId is set
-userSchema.pre("save", function (next) {
-  this.starredChats = this.starredChats.filter((chat) => {
-    const hasPartner = !!chat.chatPartnerId;
-    const hasGroup = !!chat.groupId;
-    return (hasPartner && !hasGroup) || (!hasPartner && hasGroup);
-  });
-  next();
-});
-
-// Virtual: get starred chat type (helper for frontend)
-userSchema.virtual("starredChatDetails").get(function () {
-  return this.starredChats.map((chat) => ({
-    isGroup: !!chat.groupId,
-    id: chat.groupId || chat.chatPartnerId,
-  }));
-});
+// Remove the virtual since it references the old schema structure
+// userSchema.virtual("starredChatDetails").get(function () {
+//   return this.starredChats.map((chat) => ({
+//     isGroup: !!chat.groupId,
+//     id: chat.groupId || chat.chatPartnerId,
+//   }));
+// });
 
 const User = mongoose.model("User", userSchema);
 

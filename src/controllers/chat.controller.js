@@ -165,24 +165,26 @@ export const toggleStarChat = async (req, res) => {
 
 export const getStarredData = async (req, res) => {
   try {
+    console.log("🔍 === getStarredData START ===");
+    
     const user = await User.findById(req.user._id)
       .select('starredMessages starredChats');
     
+    console.log("✅ User found:", user ? "Yes" : "No");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Extract just the IDs for the frontend
-    const starredChatIds = user.starredChats.map(chat => 
-      chat.chatPartnerId || chat.groupId
-    ).filter(Boolean);
+    console.log("📋 starredChats from DB:", user.starredChats);
+    console.log("📋 starredChats length:", user.starredChats.length);
 
+    // Now we can send the simple array directly
     res.status(200).json({
       starredMessages: user.starredMessages || [],
-      starredChats: starredChatIds // Send simple array of IDs to frontend
+      starredChats: user.starredChats || []
     });
   } catch (err) {
-    console.error("getStarredData error:", err);
+    console.error("❌ getStarredData error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
