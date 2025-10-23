@@ -42,12 +42,14 @@ const userSchema = new mongoose.Schema(
     ],
     // Chats (1-on-1 or group) the user has starred
     // We use Mixed to allow both User _id and Group _id
-    starredChats: [
-      {
-        chatPartnerId: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // for 1-on-1
-        groupId: { type: mongoose.Schema.Types.ObjectId, ref: "Group" },     // for groups
-      },
-    ],
+    // In your User model, change starredChats to:
+starredChats: [
+  {
+    type: mongoose.Schema.Types.ObjectId,
+    // No ref since it can be either User or Group
+    // We'll handle the type logic in the application
+  },
+],
     pinnedMessages: [
       {
         type: mongoose.Schema.Types.ObjectId,
