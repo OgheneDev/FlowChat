@@ -106,3 +106,18 @@ export const toggleStarChat = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+export const getStarredData = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .select('starredMessages starredChats');
+    
+    res.status(200).json({
+      starredMessages: user.starredMessages || [],
+      starredChats: user.starredChats || []
+    });
+  } catch (err) {
+    console.error("getStarredData error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
