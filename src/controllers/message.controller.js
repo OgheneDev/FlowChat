@@ -11,7 +11,7 @@ export const getAllContacts = async (req, res) => {
     // Fetch all users except the logged-in one
     const filteredUsers = await User.find(
       { _id: { $ne: loggedInUserId } },
-      "fullName email online lastSeen profilePicture" // pick needed fields
+      "fullName email online lastSeen profilePic" // pick needed fields
     );
 
     res.status(200).json(filteredUsers);
@@ -166,13 +166,15 @@ export const getChatPartners = async (req, res) => {
 
     if (!partnerIds.length) return res.status(200).json([]);
 
-    const partners = await User.find(
-      { _id: { $in: partnerIds } },
-      "fullName email online lastSeen profilePicture"
+    // FIX: Use partnerIds instead of chatPartnerIds
+    const chatPartners = await User.find(
+      { _id: { $in: partnerIds } }, // Changed from chatPartnerIds to partnerIds
+      "fullName email online lastSeen profilePic"
     ).lean();
 
+    // FIX: Use chatPartners instead of partners
     const withLast = await Promise.all(
-      partners.map(async (p) => {
+      chatPartners.map(async (p) => { // Changed from partners to chatPartners
         const last = await Message.findOne({
           $or: [
             { senderId: loggedInUserId, receiverId: p._id },
