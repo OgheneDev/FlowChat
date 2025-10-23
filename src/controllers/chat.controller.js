@@ -85,25 +85,44 @@ export const toggleStarMessage = async (req, res) => {
 
 export const toggleStarChat = async (req, res) => {
   try {
+    console.log("toggleStarChat called with:", req.body);
+    console.log("User ID:", req.user._id);
+
     const { chatPartnerId, groupId } = req.body;
-    if (!chatPartnerId && !groupId)
+    if (!chatPartnerId && !groupId) {
       return res.status(400).json({ message: "chatPartnerId or groupId required" });
+    }
 
     const user = await User.findById(req.user._id);
-    const idToToggle = chatPartnerId ?? groupId;
-
-    const idx = user.starredChats.indexOf(idToToggle);
-    if (idx > -1) {
-      user.starredChats.splice(idx, 1);
-      await res.status(200).json({ message: "Chat unstarred" });
-    } else {
-      user.starredChats.push(idToToggle);
-      await user.save();
-      res.status(200).json({ message: "Chat starred" });
+    console.log("Found user:", user._id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
+
+    const idToToggle = chatPartnerId ?? groupId;
+    console.log("ID to toggle:", idToToggle);
+    console.log("Current starredChats:", user.starredChats);
+
+    // Check if already starred
+    const isStarred = user.starredChats.includes(idToToggle);
+    
+    if (isStarred) {
+      // Unstar: remove from array
+      user.starredChats = user.starredChats.filter(id => id.toString() !== idToToggle);
+    } else {
+      // Star: add to array
+      user.starredChats.push(idToToggle);
+    }
+
+    await user.save();
+    
+    return res.status(200).json({ 
+      message: isStarred ? "Chat unstarred" : "Chat starred",
+      starredChats: user.starredChats 
+    });
   } catch (err) {
     console.error("toggleStarChat error:", err);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
