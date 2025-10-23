@@ -13,7 +13,7 @@ router.get("/chats", getChatPartners); // This now works correctly
 router.get("/:id", getMessagesByUserId);
 
 router.post("/send/:id", sendMessage);
-router.delete("/delete", protect, deleteMessage);
-router.put("/edit/:messageId", protect, editMessage);
+router.delete("/delete", deleteMessage);
+router.put("/edit/:messageId", editMessage);
 
 export const messagesRouter = router;
