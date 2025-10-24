@@ -14,6 +14,7 @@ router.use(protect)
 
 router.post("/pin", pinMessage);
 router.post("/unpin", unpinMessage);
+router.get('/pinned-data', getPinnedData);
 router.post("/star-message", toggleStarMessage);
 router.post("/star-chat", toggleStarChat);
 router.get('/starred-data', getStarredData);

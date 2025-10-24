@@ -5,56 +5,137 @@ import { ensureMember } from "../utils/chatHelpers.js";
 /** 📌 PIN MESSAGE **/
 export const pinMessage = async (req, res) => {
   try {
+    console.log("📌 === pinMessage START ===");
     const { messageId, chatPartnerId, groupId } = req.body;
     const userId = req.user._id;
 
-    if (!chatPartnerId && !groupId)
+    console.log("Request data:", { messageId, chatPartnerId, groupId, userId });
+
+    if (!chatPartnerId && !groupId) {
       return res.status(400).json({ message: "chatPartnerId or groupId required" });
+    }
 
     let target;
     if (groupId) {
+      console.log("📌 Pinning to group:", groupId);
       target = await Group.findById(groupId);
+      if (!target) {
+        return res.status(404).json({ message: "Group not found" });
+      }
       await ensureMember(userId, target);
     } else {
-      // 1-to-1: we store pinned messages on the *sender’s* user doc
+      // 1-to-1: we store pinned messages on the user's own doc
+      console.log("📌 Pinning to user's personal pinned messages");
       target = await User.findById(userId);
+      if (!target) {
+        return res.status(404).json({ message: "User not found" });
+      }
     }
 
-    if (!target.pinnedMessages.includes(messageId)) {
-      target.pinnedMessages.push(messageId);
-      await target.save();
+    console.log("📌 Current pinned messages:", target.pinnedMessages);
+    
+    // Check if already pinned
+    if (target.pinnedMessages.includes(messageId)) {
+      console.log("📌 Message already pinned");
+      return res.status(200).json({ 
+        message: "Message already pinned", 
+        pinnedMessages: target.pinnedMessages 
+      });
     }
 
-    res
-      .status(200)
-      .json({ message: "Message pinned", pinnedMessages: target.pinnedMessages });
+    target.pinnedMessages.push(messageId);
+    await target.save();
+    
+    console.log("📌 After pinning - pinned messages:", target.pinnedMessages);
+    console.log("📌 === pinMessage END ===");
+
+    res.status(200).json({ 
+      message: "Message pinned", 
+      pinnedMessages: target.pinnedMessages 
+    });
   } catch (err) {
-    console.error("pinMessage error:", err);
+    console.error("❌ pinMessage error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
 export const unpinMessage = async (req, res) => {
   try {
+    console.log("📌 === unpinMessage START ===");
     const { messageId, chatPartnerId, groupId } = req.body;
+    const userId = req.user._id;
+
+    console.log("Request data:", { messageId, chatPartnerId, groupId, userId });
 
     let target;
     if (groupId) {
+      console.log("📌 Unpinning from group:", groupId);
       target = await Group.findById(groupId);
+      if (!target) {
+        return res.status(404).json({ message: "Group not found" });
+      }
     } else if (chatPartnerId) {
-      target = await User.findById(req.user._id);
+      console.log("📌 Unpinning from user's personal pinned messages");
+      target = await User.findById(userId);
+      if (!target) {
+        return res.status(404).json({ message: "User not found" });
+      }
     } else {
       return res.status(400).json({ message: "chatPartnerId or groupId required" });
     }
 
+    console.log("📌 Current pinned messages:", target.pinnedMessages);
+    
+    const initialLength = target.pinnedMessages.length;
     target.pinnedMessages = target.pinnedMessages.filter(
       (id) => id.toString() !== messageId
     );
-    await target.save();
+    const finalLength = target.pinnedMessages.length;
+    
+    console.log(`📌 Removed ${initialLength - finalLength} messages`);
+    
+    // Only save if something changed
+    if (initialLength !== finalLength) {
+      await target.save();
+    }
+    
+    console.log("📌 After unpinning - pinned messages:", target.pinnedMessages);
+    console.log("📌 === unpinMessage END ===");
 
-    res.status(200).json({ message: "Message unpinned" });
+    res.status(200).json({ 
+      message: "Message unpinned",
+      pinnedMessages: target.pinnedMessages 
+    });
   } catch (err) {
-    console.error("unpinMessage error:", err);
+    console.error("❌ unpinMessage error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Add this endpoint to get pinned data
+export const getPinnedData = async (req, res) => {
+  try {
+    console.log("🔍 === getPinnedData START ===");
+    const userId = req.user._id;
+
+    // Get user's pinned messages (for 1-on-1 chats)
+    const user = await User.findById(userId).select('pinnedMessages');
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // In a real app, you might also want to get pinned messages from groups the user is in
+    // For now, we'll just return the user's pinned messages
+    const pinnedMessages = user.pinnedMessages || [];
+
+    console.log("📌 User pinned messages:", pinnedMessages);
+    console.log("🔍 === getPinnedData END ===");
+
+    res.status(200).json({
+      pinnedMessages: pinnedMessages
+    });
+  } catch (err) {
+    console.error("❌ getPinnedData error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
