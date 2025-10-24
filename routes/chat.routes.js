@@ -5,7 +5,9 @@ import {
   toggleStarMessage,
   toggleStarChat,
   getStarredData,
-  getPinnedData
+  getPinnedData,
+  getMessageById,
+  getMessagesByIds
 } from "../src/controllers/chat.controller.js";
 import { protect } from "../src/middleware/auth.middleware.js";
 
@@ -15,6 +17,8 @@ router.use(protect)
 
 router.post("/pin", pinMessage);
 router.post("/unpin", unpinMessage);
+router.get('/message/:messageId', getMessageById);
+router.post('/messages/details', getMessagesByIds);
 router.get('/pinned-data', getPinnedData);
 router.post("/star-message", toggleStarMessage);
 router.post("/star-chat", toggleStarChat);

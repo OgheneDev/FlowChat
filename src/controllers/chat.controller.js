@@ -1,5 +1,6 @@
 import Group from "../models/Group.js";
 import User from "../models/User.js";
+import Message from "../models/Message.js"
 import { ensureMember } from "../utils/chatHelpers.js";
 
 /** 📌 PIN MESSAGE **/
@@ -112,7 +113,7 @@ export const unpinMessage = async (req, res) => {
   }
 };
 
-// Add this endpoint to get pinned data
+// Enhanced getPinnedData endpoint that returns full message details
 export const getPinnedData = async (req, res) => {
   try {
     console.log("🔍 === getPinnedData START ===");
@@ -124,18 +125,171 @@ export const getPinnedData = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // In a real app, you might also want to get pinned messages from groups the user is in
-    // For now, we'll just return the user's pinned messages
-    const pinnedMessages = user.pinnedMessages || [];
+    const pinnedMessageIds = user.pinnedMessages || [];
+    console.log("📌 User pinned message IDs:", pinnedMessageIds);
 
-    console.log("📌 User pinned messages:", pinnedMessages);
+    // Fetch full message details for pinned messages
+    const pinnedMessages = await Message.find({ _id: { $in: pinnedMessageIds } })
+      .populate('senderId', 'fullName profilePic email')
+      .populate('replyTo', 'text image senderId')
+      .lean()
+      .sort({ createdAt: -1 });
+
+    console.log(`📌 Found ${pinnedMessages.length} pinned message details`);
+
+    // Format the messages
+    const formattedPinnedMessages = pinnedMessages.map(message => ({
+      _id: message._id,
+      text: message.text,
+      image: message.image,
+      createdAt: message.createdAt,
+      updatedAt: message.updatedAt,
+      editedAt: message.editedAt,
+      status: message.status,
+      senderId: message.senderId ? {
+        _id: message.senderId._id,
+        fullName: message.senderId.fullName,
+        profilePic: message.senderId.profilePic,
+        email: message.senderId.email
+      } : null,
+      replyTo: message.replyTo ? {
+        _id: message.replyTo._id,
+        text: message.replyTo.text,
+        image: message.replyTo.image,
+        senderId: message.replyTo.senderId
+      } : null
+    }));
+
     console.log("🔍 === getPinnedData END ===");
 
     res.status(200).json({
-      pinnedMessages: pinnedMessages
+      pinnedMessages: formattedPinnedMessages,
+      pinnedMessageIds: pinnedMessageIds // Also return IDs for backward compatibility
     });
   } catch (err) {
     console.error("❌ getPinnedData error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getMessageById = async (req, res) => {
+  try {
+    console.log("📨 === getMessageById START ===");
+    const { messageId } = req.params;
+    const userId = req.user._id;
+
+    console.log("Fetching message:", messageId, "for user:", userId);
+
+    if (!messageId) {
+      return res.status(400).json({ message: "Message ID is required" });
+    }
+
+    // Find the message and populate sender information
+    const message = await Message.findById(messageId)
+      .populate('senderId', 'fullName profilePic email')
+      .populate('replyTo', 'text image senderId')
+      .lean();
+
+    if (!message) {
+      console.log("❌ Message not found:", messageId);
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    console.log("✅ Message found:", {
+      id: message._id,
+      text: message.text?.substring(0, 50) + (message.text?.length > 50 ? '...' : ''),
+      hasImage: !!message.image,
+      sender: message.senderId?.fullName || 'Unknown'
+    });
+
+    // Format the response to match your frontend expectations
+    const formattedMessage = {
+      _id: message._id,
+      text: message.text,
+      image: message.image,
+      createdAt: message.createdAt,
+      updatedAt: message.updatedAt,
+      editedAt: message.editedAt,
+      status: message.status,
+      senderId: message.senderId ? {
+        _id: message.senderId._id,
+        fullName: message.senderId.fullName,
+        profilePic: message.senderId.profilePic,
+        email: message.senderId.email
+      } : null,
+      replyTo: message.replyTo ? {
+        _id: message.replyTo._id,
+        text: message.replyTo.text,
+        image: message.replyTo.image,
+        senderId: message.replyTo.senderId
+      } : null
+    };
+
+    console.log("📨 === getMessageById END ===");
+
+    res.status(200).json({
+      message: "Message details fetched successfully",
+      message: formattedMessage
+    });
+  } catch (err) {
+    console.error("❌ getMessageById error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Alternative version that can fetch multiple messages at once
+export const getMessagesByIds = async (req, res) => {
+  try {
+    console.log("📨 === getMessagesByIds START ===");
+    const { messageIds } = req.body;
+    const userId = req.user._id;
+
+    console.log("Fetching messages:", messageIds, "for user:", userId);
+
+    if (!messageIds || !Array.isArray(messageIds) || messageIds.length === 0) {
+      return res.status(400).json({ message: "Message IDs array is required" });
+    }
+
+    // Find all messages and populate sender information
+    const messages = await Message.find({ _id: { $in: messageIds } })
+      .populate('senderId', 'fullName profilePic email')
+      .populate('replyTo', 'text image senderId')
+      .lean()
+      .sort({ createdAt: -1 });
+
+    console.log(`✅ Found ${messages.length} messages`);
+
+    // Format the responses
+    const formattedMessages = messages.map(message => ({
+      _id: message._id,
+      text: message.text,
+      image: message.image,
+      createdAt: message.createdAt,
+      updatedAt: message.updatedAt,
+      editedAt: message.editedAt,
+      status: message.status,
+      senderId: message.senderId ? {
+        _id: message.senderId._id,
+        fullName: message.senderId.fullName,
+        profilePic: message.senderId.profilePic,
+        email: message.senderId.email
+      } : null,
+      replyTo: message.replyTo ? {
+        _id: message.replyTo._id,
+        text: message.replyTo.text,
+        image: message.replyTo.image,
+        senderId: message.replyTo.senderId
+      } : null
+    }));
+
+    console.log("📨 === getMessagesByIds END ===");
+
+    res.status(200).json({
+      message: "Messages details fetched successfully",
+      messages: formattedMessages
+    });
+  } catch (err) {
+    console.error("❌ getMessagesByIds error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
