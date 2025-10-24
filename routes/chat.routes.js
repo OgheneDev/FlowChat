@@ -4,7 +4,8 @@ import {
   unpinMessage,
   toggleStarMessage,
   toggleStarChat,
-  getStarredData
+  getStarredData,
+  getPinnedData
 } from "../src/controllers/chat.controller.js";
 import { protect } from "../src/middleware/auth.middleware.js";
 
