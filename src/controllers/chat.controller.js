@@ -119,52 +119,21 @@ export const getPinnedData = async (req, res) => {
     console.log("🔍 === getPinnedData START ===");
     const userId = req.user._id;
 
-    // Get user's pinned messages (for 1-on-1 chats)
+    // Get user's pinned messages (just the IDs)
     const user = await User.findById(userId).select('pinnedMessages');
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
     const pinnedMessageIds = user.pinnedMessages || [];
-    console.log("📌 User pinned message IDs:", pinnedMessageIds);
-
-    // Fetch full message details for pinned messages
-    const pinnedMessages = await Message.find({ _id: { $in: pinnedMessageIds } })
-      .populate('senderId', 'fullName profilePic email')
-      .populate('replyTo', 'text image senderId')
-      .lean()
-      .sort({ createdAt: -1 });
-
-    console.log(`📌 Found ${pinnedMessages.length} pinned message details`);
-
-    // Format the messages
-    const formattedPinnedMessages = pinnedMessages.map(message => ({
-      _id: message._id,
-      text: message.text,
-      image: message.image,
-      createdAt: message.createdAt,
-      updatedAt: message.updatedAt,
-      editedAt: message.editedAt,
-      status: message.status,
-      senderId: message.senderId ? {
-        _id: message.senderId._id,
-        fullName: message.senderId.fullName,
-        profilePic: message.senderId.profilePic,
-        email: message.senderId.email
-      } : null,
-      replyTo: message.replyTo ? {
-        _id: message.replyTo._id,
-        text: message.replyTo.text,
-        image: message.replyTo.image,
-        senderId: message.replyTo.senderId
-      } : null
-    }));
-
-    console.log("🔍 === getPinnedData END ===");
+    
+    // Convert ObjectIds to strings
+    const pinnedMessageIdStrings = pinnedMessageIds.map(id => id.toString());
+    
+    console.log("📌 User pinned message IDs:", pinnedMessageIdStrings);
 
     res.status(200).json({
-      pinnedMessages: formattedPinnedMessages,
-      pinnedMessageIds: pinnedMessageIds // Also return IDs for backward compatibility
+      pinnedMessages: pinnedMessageIdStrings // Return only IDs, not full objects
     });
   } catch (err) {
     console.error("❌ getPinnedData error:", err);
@@ -241,7 +210,7 @@ export const getMessageById = async (req, res) => {
 export const getMessagesByIds = async (req, res) => {
   try {
     console.log("📨 === getMessagesByIds START ===");
-    const { messageIds } = req.body;
+    let { messageIds } = req.body;
     const userId = req.user._id;
 
     console.log("Fetching messages:", messageIds, "for user:", userId);
@@ -250,8 +219,22 @@ export const getMessagesByIds = async (req, res) => {
       return res.status(400).json({ message: "Message IDs array is required" });
     }
 
+    // Handle case where messageIds might be objects with _id property
+    const actualMessageIds = messageIds.map(id => {
+      if (typeof id === 'string') {
+        return id;
+      } else if (id && id._id) {
+        return id._id;
+      } else {
+        console.error("Invalid message ID format:", id);
+        return null;
+      }
+    }).filter(Boolean);
+
+    console.log("Processed message IDs:", actualMessageIds);
+
     // Find all messages and populate sender information
-    const messages = await Message.find({ _id: { $in: messageIds } })
+    const messages = await Message.find({ _id: { $in: actualMessageIds } })
       .populate('senderId', 'fullName profilePic email')
       .populate('replyTo', 'text image senderId')
       .lean()
