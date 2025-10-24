@@ -274,7 +274,13 @@ export const editMessage = async (req, res) => {
     msg.editedAt = new Date();
     await msg.save();
 
-    const populated = await populateMessage(Message.findById(msg._id));
+    // Replace populateMessage with direct population
+    const populated = await Message.findById(msg._id)
+      .populate('senderId', 'username avatar displayName')
+      .populate('reactions.userId', 'username displayName')
+      .populate('replyTo', 'text senderId')
+      .exec();
+
     res.status(200).json({ message: "Edited", updatedMessage: populated });
   } catch (err) {
     console.error("editMessage error:", err);
