@@ -34,9 +34,13 @@ export const getMessagesByUserId = async (req, res) => {
     })
       .populate("deletedBy", "fullName")
       .populate({
+        path: "senderId",
+        select: "fullName profilePic",
+      }) // Populate senderId for main message
+      .populate({
         path: "replyTo",
         select: "text image senderId createdAt",
-        populate: { path: "senderId", select: "fullName profileImage" },
+        populate: { path: "senderId", select: "fullName profilePic" },
       })
       .sort({ createdAt: 1 });
 
