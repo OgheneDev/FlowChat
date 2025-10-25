@@ -274,14 +274,14 @@ export const editMessage = async (req, res) => {
     msg.editedAt = new Date();
     await msg.save();
 
-    // Replace populateMessage with direct population
+    // Only populate fields that actually exist and are needed
     const populated = await Message.findById(msg._id)
-      .populate('senderId', 'username avatar displayName')
-      .populate('reactions.userId', 'username displayName')
-      .populate('replyTo', 'text senderId')
+      .populate('senderId', 'username avatar displayName fullName profilePic')
+      .populate('replyTo', 'text senderId') // Only if replyTo exists in your schema
       .exec();
 
-    res.status(200).json({ message: "Edited", updatedMessage: populated });
+    // Return the updated message directly, not nested in an object
+    res.status(200).json(populated);
   } catch (err) {
     console.error("editMessage error:", err);
     res.status(500).json({ message: "Server error" });
