@@ -68,7 +68,7 @@ export const getMessagesByUserId = async (req, res) => {
 export const sendMessage = async (req, res) => {
   try {
     const { text, image, replyTo } = req.body;
-    const { id: receiverId } = req.params; // <-- chatPartnerId
+    const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
     if (!text && !image)
@@ -106,7 +106,18 @@ export const sendMessage = async (req, res) => {
     });
     await newMsg.save();
 
-    const populated = await populateMessage(Message.findById(newMsg._id)).lean();
+    // ----- FIXED: Replace populateMessage with proper population -----
+    const populated = await Message.findById(newMsg._id)
+      .populate("senderId", "fullName profileImage")
+      .populate("receiverId", "fullName profileImage")
+      .populate({
+        path: "replyTo",
+        populate: {
+          path: "senderId",
+          select: "fullName profileImage"
+        }
+      })
+      .lean();
 
     // ----- SOCKET -----
     const receiverSocket = userSocketMap[receiverId];
