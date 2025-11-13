@@ -9,6 +9,7 @@ import { groupRouter } from "./routes/group.routes.js";
 import { chatRouter } from "./routes/chat.routes.js";
 import { searchRouter } from "./routes/search.routes.js";
 import { usersRouter } from "./routes/user.routes.js";
+import { notificationsRouter } from "./routes/notifications.routes.js";
 import { server, app } from "./src/sockets/config.js";
 import { swaggerSpec } from "./swagger.js";
 import { devRouter } from "./routes/dev.routes.js";
@@ -59,6 +60,7 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }));
   app.use("/api/search", searchRouter);
   app.use("/api/dev", devRouter);
   app.use("/api/users", usersRouter);
+  app.use("/api/notifications", notificationsRouter);
 
   // Swagger route
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
