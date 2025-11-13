@@ -205,7 +205,7 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
   });
 
   // Add device token handler for push notifications
-  socket.on("registerDeviceToken", async ({ token, deviceType = "web" }) => {
+ socket.on("registerDeviceToken", async ({ token, deviceType = "web" }) => {
   try {
     console.log('🔑 [TOKEN REGISTRATION] Starting for user:', userId);
     console.log('📱 [TOKEN REGISTRATION] Token received:', token);
@@ -216,18 +216,8 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
       console.log('👤 [TOKEN REGISTRATION] User found:', user.fullName);
       console.log('📊 [TOKEN REGISTRATION] Current tokens before:', user.deviceTokens);
       
-      // REPLACE THIS: await user.addDeviceToken(token, deviceType);
-      // WITH THIS DIRECT UPDATE:
-      await User.findByIdAndUpdate(userId, {
-        $pull: { deviceTokens: { token: token } }, // Remove if exists
-        $push: { 
-          deviceTokens: {
-            token: token,
-            deviceType: deviceType,
-            createdAt: new Date()
-          }
-        }
-      });
+      // FIX: Use the schema method instead of direct update
+      await user.addDeviceToken(token, deviceType);
       
       // Refresh user to see updated tokens
       const updatedUser = await User.findById(userId).select('deviceTokens');
