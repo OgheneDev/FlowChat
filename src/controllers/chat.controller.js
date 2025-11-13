@@ -223,9 +223,6 @@ export const getPinnedData = async (req, res) => {
       })
       .filter(Boolean);
 
-    console.log(`📌 Found ${pinnedMessageIds.length} pinned messages for context:`, 
-      chatPartnerId || groupId);
-
     res.status(200).json({
       pinnedMessages: pinnedMessageIds
     });
