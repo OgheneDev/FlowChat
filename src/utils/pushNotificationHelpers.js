@@ -1,4 +1,4 @@
-import admin from "../config/firebase";
+import admin from "../config/firebase.js";
 
 async function sendPushNotification({ body, title, tokens, data = {} }) {
     // Filter out any invalid tokens
