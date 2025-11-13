@@ -1,11 +1,19 @@
 import admin from "../config/firebase.js";
 
 async function sendPushNotification({ body, title, tokens, data = {} }) {
+    console.log('🚀 START sendPushNotification');
+    console.log('📨 Input - Title:', title, 'Body:', body);
+    console.log('🎯 Input Tokens:', tokens);
+    console.log('📦 Input Data:', data);
+    
     // Filter out any invalid tokens
     const validTokens = tokens.filter(token => token && typeof token === 'string' && token.length > 0);
     
+    console.log('✅ Valid tokens after filtering:', validTokens);
+    console.log('📊 Valid tokens count:', validTokens.length);
+    
     if (validTokens.length === 0) {
-        console.log("No valid tokens provided");
+        console.log("❌ No valid tokens provided");
         return {
             success: false,
             message: "No valid tokens provided",
@@ -18,31 +26,35 @@ async function sendPushNotification({ body, title, tokens, data = {} }) {
     const messages = validTokens.map(token => ({
         token,
         notification: { title, body },
-        data: data // custom data payload
+        data: data
     }));
 
+    console.log('📤 Prepared messages for FCM:', messages);
+
     try {
+        console.log('🔄 Calling admin.messaging().sendEach()...');
         const response = await admin.messaging().sendEach(messages);
         
-        console.log("Successful sends:", response.successCount);
-        console.log("Failed sends:", response.failureCount);
+        console.log("✅ FCM Response - Successful sends:", response.successCount);
+        console.log("❌ FCM Response - Failed sends:", response.failureCount);
         
         // Log detailed results
         response.responses.forEach((result, index) => {
             if (result.success) {
-                console.log(`Message sent successfully to token: ${validTokens[index]}`);
+                console.log(`✅ Message sent successfully to token: ${validTokens[index]}`);
             } else {
-                console.error(`Failed to send to token: ${validTokens[index]} - Error:`, result.error);
+                console.error(`❌ Failed to send to token: ${validTokens[index]} - Error:`, result.error);
                 
                 // Handle specific error cases
                 if (result.error?.code === 'messaging/invalid-registration-token' || 
                     result.error?.code === 'messaging/registration-token-not-registered') {
-                    console.log(`Token is invalid or not registered: ${validTokens[index]}`);
+                    console.log(`🗑️ Token is invalid or not registered: ${validTokens[index]}`);
                     // You might want to remove this token from your database here
                 }
             }
         });
 
+        console.log('🎉 sendPushNotification completed successfully');
         return {
             success: true,
             message: `Notifications sent successfully`,
@@ -56,7 +68,7 @@ async function sendPushNotification({ body, title, tokens, data = {} }) {
         };
 
     } catch (error) {
-        console.error("Error sending push notifications:", error);
+        console.error("💥 Error sending push notifications:", error);
         
         return {
             success: false,
