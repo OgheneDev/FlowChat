@@ -206,31 +206,62 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
 
   // Add device token handler for push notifications
   socket.on("registerDeviceToken", async ({ token, deviceType = "web" }) => {
-    try {
-      const user = await User.findById(userId);
-      if (user) {
-        await user.addDeviceToken(token, deviceType);
-        log("success", `Device token registered for ${userName}`);
-        socket.emit("deviceTokenRegistered", { success: true });
-      }
-    } catch (err) {
-      log("error", "Device token registration failed", err);
-      socket.emit("error", { message: "Failed to register device token" });
+  try {
+    console.log('🔑 [TOKEN REGISTRATION] Starting for user:', userId);
+    console.log('📱 [TOKEN REGISTRATION] Token received:', token);
+    console.log('💻 [TOKEN REGISTRATION] Device type:', deviceType);
+    
+    const user = await User.findById(userId);
+    if (user) {
+      console.log('👤 [TOKEN REGISTRATION] User found:', user.fullName);
+      console.log('📊 [TOKEN REGISTRATION] Current tokens before:', user.deviceTokens);
+      
+      // REPLACE THIS: await user.addDeviceToken(token, deviceType);
+      // WITH THIS DIRECT UPDATE:
+      await User.findByIdAndUpdate(userId, {
+        $pull: { deviceTokens: { token: token } }, // Remove if exists
+        $push: { 
+          deviceTokens: {
+            token: token,
+            deviceType: deviceType,
+            createdAt: new Date()
+          }
+        }
+      });
+      
+      // Refresh user to see updated tokens
+      const updatedUser = await User.findById(userId).select('deviceTokens');
+      console.log('✅ [TOKEN REGISTRATION] Tokens after save:', updatedUser.deviceTokens);
+      
+      log("success", `Device token registered for ${userName}`);
+      socket.emit("deviceTokenRegistered", { success: true });
+    } else {
+      console.log('❌ [TOKEN REGISTRATION] User not found');
     }
-  });
+  } catch (err) {
+    console.error('💥 [TOKEN REGISTRATION] Error:', err);
+    log("error", "Device token registration failed", err);
+    socket.emit("error", { message: "Failed to register device token" });
+  }
+});
 
   // Remove device token handler
   socket.on("removeDeviceToken", async ({ token }) => {
-    try {
-      const user = await User.findById(userId);
-      if (user) {
-        await user.removeDeviceToken(token);
-        log("success", `Device token removed for ${userName}`);
-        socket.emit("deviceTokenRemoved", { success: true });
-      }
-    } catch (err) {
-      log("error", "Device token removal failed", err);
-      socket.emit("error", { message: "Failed to remove device token" });
+  try {
+    const user = await User.findById(userId);
+    if (user) {
+      // REPLACE THIS: await user.removeDeviceToken(token);
+      // WITH THIS DIRECT UPDATE:
+      await User.findByIdAndUpdate(userId, {
+        $pull: { deviceTokens: { token: token } }
+      });
+      
+      log("success", `Device token removed for ${userName}`);
+      socket.emit("deviceTokenRemoved", { success: true });
     }
-  });
+  } catch (err) {
+    log("error", "Device token removal failed", err);
+    socket.emit("error", { message: "Failed to remove device token" });
+  }
+});
 };
