@@ -124,14 +124,24 @@ export const sendMessage = async (req, res) => {
     // ----- PUSH NOTIFICATION -----
     // Only send if receiver is offline (no socket connection)
     const receiverSocket = userSocketMap[receiverId];
+
+    console.log('🔌 Socket Status for', receiverId, ':', receiverSocket ? 'ONLINE' : 'OFFLINE');
     
     if (!receiverSocket) {
+      console.log('📤 User is OFFLINE - attempting push notification');
+
       try {
         // Get receiver's device tokens
         const receiverUser = await User.findById(receiverId).select('deviceTokens fullName');
+        console.log('👤 Receiver user found:', receiverUser.fullName);
+        console.log('🔑 Device tokens:', receiverUser.deviceTokens);
+
         const activeTokens = receiverUser.deviceTokens.map(device => device.token);
+        console.log('🎯 Active tokens:', activeTokens);
         
         if (activeTokens.length > 0) {
+          console.log('🚀 Calling sendPushNotification with', activeTokens.length, 'tokens');
+          
           const senderUser = await User.findById(senderId).select('fullName');
           const messagePreview = text ? (text.length > 50 ? text.substring(0, 50) + '...' : text) : '📷 Photo';
           
