@@ -64,15 +64,22 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
           .lean();
 
         const receiverSocketId = userSocketMap[receiverId];
+        console.log('🔌 [SOCKET] Socket Status for', receiverId, ':', receiverSocketId ? 'ONLINE' : 'OFFLINE');
+        console.log('👥 [SOCKET] All connected users:', Object.keys(userSocketMap));
         
         // ----- PUSH NOTIFICATION -----
         // Only send if receiver is offline
         if (!receiverSocketId) {
+          console.log('📤 [SOCKET] User is OFFLINE - attempting push notification');
           try {
             const receiverUser = await User.findById(receiverId).select('deviceTokens fullName');
+            console.log('👤 [SOCKET] Receiver user:', receiverUser?.fullName);
+            console.log('🔑 [SOCKET] Device tokens found:', receiverUser?.deviceTokens?.length || 0);
             const activeTokens = receiverUser.deviceTokens.map(device => device.token);
+            console.log('🎯 [SOCKET] Active tokens:', activeTokens);
             
             if (activeTokens.length > 0) {
+              console.log('🚀 [SOCKET] Calling sendPushNotification with', activeTokens.length, 'tokens');
               const messagePreview = text ? (text.length > 50 ? text.substring(0, 50) + '...' : text) : '📷 Photo';
               
               await sendPushNotification({
@@ -87,12 +94,17 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
                   click_action: 'FLUTTER_NOTIFICATION_CLICK'
                 }
               });
-              
+              console.log('✅ [SOCKET] Push notification function completed');
               log("push", `Push notification sent to ${receiverUser.fullName}`);
+            } else {
+              console.log('❌ [SOCKET] No active tokens found for user');
             }
           } catch (pushError) {
+            console.error('💥 [SOCKET] Push notification error:', pushError);
             log("error", "Push notification failed", pushError);
           }
+        } else {
+          console.log('💬 [SOCKET] User is ONLINE - skipping push notification');
         }
         
         // Determine initial status
