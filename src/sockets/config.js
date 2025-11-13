@@ -11,7 +11,7 @@ const io = new Server(server, {
     origin: [
       process.env.CLIENT_URL,
       "http://localhost:3000",
-      "https://flowchat-three.vercel.app", 
+      "https://flowchatt.vercel.app", 
     ].filter(Boolean),
     methods: ["GET", "POST"],
     credentials: true,

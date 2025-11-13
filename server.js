@@ -31,7 +31,7 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }));
   // CORS
   const allowedOrigins = [
     "http://localhost:3000",
-    "https://flowchat-three.vercel.app",
+    "https://flowchatt.vercel.app",
   ];
 
   app.use(
