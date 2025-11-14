@@ -9,6 +9,8 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
   socket.on(
     "sendMessage",
     async ({ receiverId, text, image, replyTo }) => {
+      console.log('🛣️ [DEBUG] Socket sendMessage called for user:', userName);
+    console.log('🛣️ [DEBUG] Message text:', text?.substring(0, 50));
       log(`${userName} is sending a private message`, { receiverId, text });
       try {
         if (!receiverId || (!text && !image)) {

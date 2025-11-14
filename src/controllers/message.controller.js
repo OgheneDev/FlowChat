@@ -68,6 +68,8 @@ export const getMessagesByUserId = async (req, res) => {
 };
 
 export const sendMessage = async (req, res) => {
+  console.log('🛣️ [DEBUG] REST sendMessage called');
+  console.log('🛣️ [DEBUG] Receiver ID:', req.params.id);
   try {
     const { text, image, replyTo, isForwarded } = req.body;
     const { id: receiverId } = req.params;

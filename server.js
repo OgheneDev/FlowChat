@@ -16,6 +16,7 @@ import { devRouter } from "./routes/dev.routes.js";
 import swaggerUi from "swagger-ui-express";
 import { setupConnection } from "./src/sockets/connection.js";
 import { io } from "./src/sockets/config.js";
+import User from "./src/models/User.js";
 
 const __dirname = path.resolve();
 const PORT = process.env.PORT || 5000;
@@ -61,6 +62,12 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }));
   app.use("/api/dev", devRouter);
   app.use("/api/users", usersRouter);
   app.use("/api/notifications", notificationsRouter);
+  // Add this temporary route to check tokens
+app.get('/debug-tokens', async (req, res) => {
+  const user = await User.findById('69134f85cee4b22c629d6724').select('deviceTokens');
+  console.log('🔑 User tokens:', user.deviceTokens);
+  res.json({ tokenCount: user.deviceTokens.length, tokens: user.deviceTokens });
+});
 
   // Swagger route
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
