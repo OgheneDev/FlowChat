@@ -62,12 +62,7 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }));
   app.use("/api/dev", devRouter);
   app.use("/api/users", usersRouter);
   app.use("/api/notifications", notificationsRouter);
-  // Add this temporary route to check tokens
-app.get('/debug-tokens', async (req, res) => {
-  const user = await User.findById('69134f85cee4b22c629d6724').select('deviceTokens');
-  console.log('🔑 User tokens:', user.deviceTokens);
-  res.json({ tokenCount: user.deviceTokens.length, tokens: user.deviceTokens });
-});
+  
 
   // Swagger route
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
