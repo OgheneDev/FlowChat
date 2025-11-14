@@ -127,6 +127,7 @@ export const sendMessage = async (req, res) => {
 
     console.log('🔌 Socket Status for', receiverId, ':', receiverSocket ? 'ONLINE' : 'OFFLINE');
     
+    /*
     if (!receiverSocket) {
       console.log('📤 User is OFFLINE - attempting push notification');
 
@@ -164,7 +165,7 @@ export const sendMessage = async (req, res) => {
         console.error('Push notification error:', pushError);
         // Don't fail the message send if push notification fails
       }
-    }
+    }*/
 
     // ----- SOCKET -----
     const senderSocket = userSocketMap[senderId];
