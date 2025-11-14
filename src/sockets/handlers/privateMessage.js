@@ -6,6 +6,12 @@ import { userSocketMap } from "../state.js";
 import sendPushNotification from "../../utils/pushNotificationHelpers.js";
 
 export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
+
+  if (socket._events && socket._events["sendMessage"]) {
+    console.log('🔕 [SOCKET] sendMessage handler already registered, skipping');
+    return;
+  }
+  
   socket.on(
     "sendMessage",
     async ({ receiverId, text, image, replyTo }) => {
