@@ -6,22 +6,38 @@ export const registerDeviceToken = async (req, res) => {
     const userId = req.user._id;
 
     console.log('🔑 [HTTP TOKEN REGISTRATION] Starting for user:', userId);
-    console.log('📱 [HTTP TOKEN REGISTRATION] Token received:', token);
 
-    const user = await User.findById(userId);
-    if (!user) {
+    // Atomic update - no version conflict possible
+    const result = await User.findByIdAndUpdate(
+      userId,
+      {
+        $pull: { deviceTokens: { token } }, // Remove if exists
+      },
+      { new: false }
+    );
+
+    if (!result) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    console.log('👤 [HTTP TOKEN REGISTRATION] User found:', user.fullName);
-    console.log('📊 [HTTP TOKEN REGISTRATION] Current tokens before:', user.deviceTokens);
+    // Now add the token with updated timestamp
+    await User.findByIdAndUpdate(
+      userId,
+      {
+        $push: {
+          deviceTokens: {
+            token,
+            deviceType,
+            createdAt: new Date()
+          }
+        }
+      },
+      { new: true }
+    );
 
-    await user.addDeviceToken(token, deviceType);
-
-    const updatedUser = await User.findById(userId).select('deviceTokens');
-    console.log('✅ [HTTP TOKEN REGISTRATION] Tokens after save:', updatedUser.deviceTokens);
-
+    console.log('✅ [HTTP TOKEN REGISTRATION] Token registered successfully');
     res.json({ success: true, message: 'Device token registered' });
+    
   } catch (error) {
     console.error('💥 [HTTP TOKEN REGISTRATION] Error:', error);
     res.status(500).json({ error: 'Failed to register device token' });
