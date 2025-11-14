@@ -6,7 +6,6 @@ async function sendPushNotification({ body, title, tokens, data = {} }) {
     console.log('🎯 Input Tokens:', tokens);
     console.log('📦 Input Data:', data);
     
-    // Filter out any invalid tokens
     const validTokens = tokens.filter(token => token && typeof token === 'string' && token.length > 0);
     
     console.log('✅ Valid tokens after filtering:', validTokens);
@@ -23,10 +22,17 @@ async function sendPushNotification({ body, title, tokens, data = {} }) {
         };
     }
 
+    // CRITICAL FIX: Only send data payload, NO notification field
+    // The Service Worker will create the notification
     const messages = validTokens.map(token => ({
         token,
-        notification: { title, body },
-        data: data
+        // Remove this line: notification: { title, body },
+        data: {
+            ...data,
+            // Add title and body to data instead
+            notificationTitle: title,
+            notificationBody: body
+        }
     }));
 
     console.log('📤 Prepared messages for FCM:', messages);
@@ -38,18 +44,15 @@ async function sendPushNotification({ body, title, tokens, data = {} }) {
         console.log("✅ FCM Response - Successful sends:", response.successCount);
         console.log("❌ FCM Response - Failed sends:", response.failureCount);
         
-        // Log detailed results
         response.responses.forEach((result, index) => {
             if (result.success) {
                 console.log(`✅ Message sent successfully to token: ${validTokens[index]}`);
             } else {
                 console.error(`❌ Failed to send to token: ${validTokens[index]} - Error:`, result.error);
                 
-                // Handle specific error cases
                 if (result.error?.code === 'messaging/invalid-registration-token' || 
                     result.error?.code === 'messaging/registration-token-not-registered') {
                     console.log(`🗑️ Token is invalid or not registered: ${validTokens[index]}`);
-                    // You might want to remove this token from your database here
                 }
             }
         });
