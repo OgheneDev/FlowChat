@@ -38,7 +38,7 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
-    // Only this part is needed for push notifications:
+    // Device tokens for push notifications
     deviceTokens: [
       {
         token: {
@@ -78,6 +78,14 @@ const userSchema = new mongoose.Schema(
     }],
     resetPasswordToken: { type: String, default: null },
     resetPasswordExpire: { type: Date, default: null },
+    
+    // ✅ NEW: Store unread counts per chat/group
+    unreadCounts: {
+      type: Map,
+      of: Number,
+      default: new Map()
+    },
+    // Map structure: { "chatPartnerId": count, "group_groupId": count }
   },
   { timestamps: true }
 );
@@ -88,7 +96,7 @@ userSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Simple method to add a device token
+// Device token methods
 userSchema.methods.addDeviceToken = function(token, deviceType = "web") {
   // Remove if exists to avoid duplicates
   this.deviceTokens = this.deviceTokens.filter(
@@ -104,13 +112,32 @@ userSchema.methods.addDeviceToken = function(token, deviceType = "web") {
   return this.save();
 };
 
-// Simple method to remove a device token
 userSchema.methods.removeDeviceToken = function(token) {
   this.deviceTokens = this.deviceTokens.filter(
     device => device.token !== token
   );
   
   return this.save();
+};
+
+// ✅ NEW: Unread count methods
+userSchema.methods.incrementUnread = async function(chatId, isGroup = false) {
+  const key = isGroup ? `group_${chatId}` : chatId;
+  const current = this.unreadCounts.get(key) || 0;
+  this.unreadCounts.set(key, current + 1);
+  await this.save();
+  return this.unreadCounts.get(key);
+};
+
+userSchema.methods.clearUnread = async function(chatId, isGroup = false) {
+  const key = isGroup ? `group_${chatId}` : chatId;
+  this.unreadCounts.set(key, 0);
+  await this.save();
+};
+
+userSchema.methods.getUnread = function(chatId, isGroup = false) {
+  const key = isGroup ? `group_${chatId}` : chatId;
+  return this.unreadCounts.get(key) || 0;
 };
 
 const User = mongoose.model("User", userSchema);

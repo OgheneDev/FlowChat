@@ -1,6 +1,7 @@
 import { log } from "../logger.js";
 import Group from "../../models/Group.js";
 import Message from "../../models/Message.js";
+import User from "../../models/User.js";
 import cloudinary from "../../lib/cloudinary.js";
 import { userSocketMap } from "../state.js";
 import sendPushNotification from "../../utils/pushNotificationHelpers.js";
@@ -64,13 +65,20 @@ export const registerGroupMessageHandler = (io, socket, userName, userId) => {
         // Get all group members (excluding sender)
         const otherMembers = group.members.filter(m => m._id.toString() !== userId);
 
-        // ----- PUSH NOTIFICATIONS -----
-        // Get offline members for push notifications
+        // ✅ INCREMENT UNREAD FOR OFFLINE MEMBERS
         const offlineMembers = otherMembers.filter(member => 
           !userSocketMap[member._id.toString()]
         );
 
-        // Send push notifications to offline members
+        // Update unread counts for offline members in backend
+        for (const member of offlineMembers) {
+          const memberUser = await User.findById(member._id);
+          if (memberUser) {
+            await memberUser.incrementUnread(groupId, true); // true = isGroup
+          }
+        }
+
+        // ----- PUSH NOTIFICATIONS -----
         if (offlineMembers.length > 0) {
           try {
             const messagePreview = text ? (text.length > 50 ? text.substring(0, 50) + '...' : text) : '📷 Photo';
@@ -114,18 +122,15 @@ export const registerGroupMessageHandler = (io, socket, userName, userId) => {
           await Message.findByIdAndUpdate(newMsg._id, { status: "delivered" });
         }
 
-        // Calculate unread counts for each member and send updates
-        for (const member of otherMembers) {
+        // Send to each online member with their unread count from backend
+        for (const member of otherMembers) { 
           const memberId = member._id.toString();
           const memberSocketId = userSocketMap[memberId];
           
           if (memberSocketId) {
-            // Calculate unread count for this specific group member
-            const unreadCount = await Message.countDocuments({
-              groupId,
-              senderId: { $ne: memberId }, // Messages not from this member
-              status: { $ne: 'seen' }
-            });
+            // ✅ GET UNREAD COUNT FROM BACKEND
+            const memberUser = await User.findById(memberId);
+            const unreadCount = memberUser ? memberUser.getUnread(groupId, true) : 0;
 
             // Send message to member
             io.to(memberSocketId).emit("newGroupMessage", {
@@ -134,7 +139,7 @@ export const registerGroupMessageHandler = (io, socket, userName, userId) => {
               status: "delivered",
             });
 
-            // Emit unread count update
+            // ✅ SEND UNREAD COUNT FROM BACKEND
             io.to(memberSocketId).emit("groupUnreadCountUpdated", {
               groupId: groupId,
               unreadCount: unreadCount
@@ -163,33 +168,32 @@ export const registerGroupMessageHandler = (io, socket, userName, userId) => {
     }
   );
 
-  // Mark group messages as seen handler
+  // ✅ MARK GROUP MESSAGES AS SEEN - Now updates backend
   socket.on("markGroupMessagesAsSeen", async ({ groupId }) => {
     try {
       // Update all group messages that aren't from this user to seen
       await Message.updateMany(
         {
           groupId: groupId,
-          senderId: { $ne: userId }, // Not the user's own messages
+          senderId: { $ne: userId },
           status: { $ne: 'seen' }
         },
         { status: 'seen' }
       );
 
-      // Calculate new unread count (should be 0)
-      const unreadCount = await Message.countDocuments({
-        groupId: groupId,
-        senderId: { $ne: userId },
-        status: { $ne: 'seen' }
-      });
+      // ✅ CLEAR UNREAD COUNT IN BACKEND
+      const user = await User.findById(userId);
+      if (user) {
+        await user.clearUnread(groupId, true); // true = isGroup
+      }
 
       // Emit unread count update to current user
       io.to(socket.id).emit("groupUnreadCountUpdated", {
         groupId: groupId,
-        unreadCount: unreadCount
+        unreadCount: 0
       });
 
-      // Notify other group members that messages were seen (optional)
+      // Notify other group members that messages were seen
       const group = await Group.findById(groupId);
       if (group) {
         const otherMembers = group.members.filter(m => m._id.toString() !== userId);

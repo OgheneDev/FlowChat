@@ -16,7 +16,7 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
     "sendMessage",
     async ({ receiverId, text, image, replyTo }) => {
       console.log('🛣️ [DEBUG] Socket sendMessage called for user:', userName);
-    console.log('🛣️ [DEBUG] Message text:', text?.substring(0, 50));
+      console.log('🛣️ [DEBUG] Message text:', text?.substring(0, 50));
       log(`${userName} is sending a private message`, { receiverId, text });
       try {
         if (!receiverId || (!text && !image)) {
@@ -73,21 +73,24 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
 
         const receiverSocketId = userSocketMap[receiverId];
         console.log('🔌 [SOCKET] Socket Status for', receiverId, ':', receiverSocketId ? 'ONLINE' : 'OFFLINE');
-        console.log('👥 [SOCKET] All connected users:', Object.keys(userSocketMap));
+        
+        // Determine initial status
+        let finalStatus = "sent"; 
+        
+        // ✅ INCREMENT UNREAD COUNT (Backend)
+        if (!receiverSocketId) {
+          // Receiver is offline - increment unread
+          await receiver.incrementUnread(userId, false);
+        }
         
         // ----- PUSH NOTIFICATION -----
-        // Only send if receiver is offline
         if (!receiverSocketId) {
           console.log('📤 [SOCKET] User is OFFLINE - attempting push notification');
           try {
             const receiverUser = await User.findById(receiverId).select('deviceTokens fullName');
-            console.log('👤 [SOCKET] Receiver user:', receiverUser?.fullName);
-            console.log('🔑 [SOCKET] Device tokens found:', receiverUser?.deviceTokens?.length || 0);
             const activeTokens = receiverUser.deviceTokens.map(device => device.token);
-            console.log('🎯 [SOCKET] Active tokens:', activeTokens);
             
             if (activeTokens.length > 0) {
-              console.log('🚀 [SOCKET] Calling sendPushNotification with', activeTokens.length, 'tokens');
               const messagePreview = text ? (text.length > 50 ? text.substring(0, 50) + '...' : text) : '📷 Photo';
               
               await sendPushNotification({
@@ -102,21 +105,13 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
                   click_action: 'FLUTTER_NOTIFICATION_CLICK'
                 }
               });
-              console.log('✅ [SOCKET] Push notification function completed');
               log("push", `Push notification sent to ${receiverUser.fullName}`);
-            } else {
-              console.log('❌ [SOCKET] No active tokens found for user');
             }
           } catch (pushError) {
             console.error('💥 [SOCKET] Push notification error:', pushError);
             log("error", "Push notification failed", pushError);
           }
-        } else {
-          console.log('💬 [SOCKET] User is ONLINE - skipping push notification');
         }
-        
-        // Determine initial status
-        let finalStatus = "sent";
         
         // If receiver is online, send them the message and update status
         if (receiverSocketId) {
@@ -124,14 +119,10 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
           await Message.findByIdAndUpdate(newMsg._id, { status: "delivered" });
           finalStatus = "delivered";
           
-          // Calculate unread count for receiver
-          const unreadCount = await Message.countDocuments({
-            receiverId,
-            senderId: userId,
-            status: { $ne: 'seen' }
-          });
+          // ✅ GET CURRENT UNREAD COUNT
+          const unreadCount = receiver.getUnread(userId, false);
           
-          // Send message to receiver (NOT to sender)
+          // Send message to receiver
           io.to(receiverSocketId).emit("newMessage", {
             ...populated,
             status: "delivered",
@@ -143,14 +134,14 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
             lastMessage: { ...populated, status: "delivered" },
           });
           
-          // Emit unread count update to receiver
+          // ✅ SEND UNREAD COUNT TO RECEIVER
           io.to(receiverSocketId).emit("unreadCountUpdated", {
-            chatId: userId, // The sender's ID is the chat ID for the receiver
+            chatId: userId,
             unreadCount: unreadCount
           });
         }
         
-        // Send status update to sender (so they see delivered checkmarks)
+        // Send status update to sender
         io.to(socket.id).emit("messageStatusUpdate", {
           messageId: newMsg._id,
           status: finalStatus,
@@ -170,10 +161,10 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
     }
   );
 
-  // Mark messages as seen handler
+  // ✅ MARK MESSAGES AS SEEN - Now updates backend
   socket.on("markMessagesAsSeen", async ({ senderId }) => {
     try {
-      // Update all messages from this sender to seen
+      // Update message status in DB
       await Message.updateMany(
         {
           senderId: senderId,
@@ -183,17 +174,16 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
         { status: 'seen' }
       );
 
-      // Calculate new unread count (should be 0)
-      const unreadCount = await Message.countDocuments({
-        senderId: senderId,
-        receiverId: userId,
-        status: { $ne: 'seen' }
-      });
+      // ✅ CLEAR UNREAD COUNT IN BACKEND
+      const user = await User.findById(userId);
+      if (user) {
+        await user.clearUnread(senderId, false);
+      }
 
       // Emit unread count update to current user
       io.to(socket.id).emit("unreadCountUpdated", {
         chatId: senderId,
-        unreadCount: unreadCount
+        unreadCount: 0
       });
 
       // Notify the sender that their messages were seen
@@ -212,54 +202,53 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
     }
   });
 
-  // Add device token handler for push notifications
- socket.on("registerDeviceToken", async ({ token, deviceType = "web" }) => {
-  try {
-    console.log('🔑 [TOKEN REGISTRATION] Starting for user:', userId);
-    console.log('📱 [TOKEN REGISTRATION] Token received:', token);
-    console.log('💻 [TOKEN REGISTRATION] Device type:', deviceType);
-    
-    const user = await User.findById(userId);
-    if (user) {
-      console.log('👤 [TOKEN REGISTRATION] User found:', user.fullName);
-      console.log('📊 [TOKEN REGISTRATION] Current tokens before:', user.deviceTokens);
-      
-      // FIX: Use the schema method instead of direct update
-      await user.addDeviceToken(token, deviceType);
-      
-      // Refresh user to see updated tokens
-      const updatedUser = await User.findById(userId).select('deviceTokens');
-      console.log('✅ [TOKEN REGISTRATION] Tokens after save:', updatedUser.deviceTokens);
-      
-      log("success", `Device token registered for ${userName}`);
-      socket.emit("deviceTokenRegistered", { success: true });
-    } else {
-      console.log('❌ [TOKEN REGISTRATION] User not found');
+  // ✅ REQUEST UNREAD COUNTS - New handler
+  socket.on("requestUnreadCounts", async () => {
+    try {
+      const user = await User.findById(userId);
+      if (user) {
+        // Convert Map to object for transmission
+        const unreadCounts = {};
+        user.unreadCounts.forEach((count, chatId) => {
+          // Remove "group_" prefix for consistent frontend handling
+          const cleanId = chatId.startsWith('group_') ? chatId.substring(6) : chatId;
+          const isGroup = chatId.startsWith('group_');
+          unreadCounts[cleanId] = { count, isGroup };
+        });
+        
+        socket.emit("allUnreadCounts", unreadCounts);
+        log("success", `Sent unread counts to ${userName}`);
+      }
+    } catch (err) {
+      log("error", "requestUnreadCounts error", err);
     }
-  } catch (err) {
-    console.error('💥 [TOKEN REGISTRATION] Error:', err);
-    log("error", "Device token registration failed", err);
-    socket.emit("error", { message: "Failed to register device token" });
-  }
-});
+  });
 
-  // Remove device token handler
+  // Device token handlers (unchanged)
+  socket.on("registerDeviceToken", async ({ token, deviceType = "web" }) => {
+    try {
+      const user = await User.findById(userId);
+      if (user) {
+        await user.addDeviceToken(token, deviceType);
+        log("success", `Device token registered for ${userName}`);
+        socket.emit("deviceTokenRegistered", { success: true });
+      }
+    } catch (err) {
+      log("error", "Device token registration failed", err);
+      socket.emit("error", { message: "Failed to register device token" });
+    }
+  });
+
   socket.on("removeDeviceToken", async ({ token }) => {
-  try {
-    const user = await User.findById(userId);
-    if (user) {
-      // REPLACE THIS: await user.removeDeviceToken(token);
-      // WITH THIS DIRECT UPDATE:
+    try {
       await User.findByIdAndUpdate(userId, {
         $pull: { deviceTokens: { token: token } }
       });
-      
       log("success", `Device token removed for ${userName}`);
       socket.emit("deviceTokenRemoved", { success: true });
+    } catch (err) {
+      log("error", "Device token removal failed", err);
+      socket.emit("error", { message: "Failed to remove device token" });
     }
-  } catch (err) {
-    log("error", "Device token removal failed", err);
-    socket.emit("error", { message: "Failed to remove device token" });
-  }
-});
+  });
 };
