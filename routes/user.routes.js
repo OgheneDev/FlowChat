@@ -5,7 +5,7 @@ import { getUserById, getUnreadCounts } from "../src/controllers/user.controller
 
 router.use(protect)
 
-router.get("/:id", getUserById);
 router.get("/unread-counts", getUnreadCounts)
+router.get("/:id", getUserById);
 
 export const usersRouter = router;
