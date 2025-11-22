@@ -97,22 +97,22 @@ export const createGroup = async (req, res) => {
 export const getMyGroups = async (req, res) => {
   try {
     const userId = req.user._id;
+    
+    // ✅ Fetch the current user to access their unreadCounts
+    const currentUser = await User.findById(userId);
 
-    // Fetch groups as plain objects so we can attach lastMessage
     const groups = await Group.find({
-      members: userId, // because admins are also in members
+      members: userId,
     })
       .populate("admins", "fullName profilePic email")
       .populate("members", "fullName profilePic email")
       .sort({ createdAt: -1 })
       .lean();
 
-    // Attach lastMessage for each group
     const groupsWithLast = await Promise.all(
       groups.map(async (group) => {
         const lastMessage = await Message.findOne({ 
           groupId: group._id,
-          // Exclude messages deleted for the current user
           deletedFor: { $ne: userId }
         })
           .populate("senderId", "fullName profilePic email")
@@ -124,15 +124,18 @@ export const getMyGroups = async (req, res) => {
           .sort({ createdAt: -1 })
           .lean();
 
-        // If last message was deleted for everyone, normalize display (optional)
         if (lastMessage && lastMessage.deletedForEveryone) {
           lastMessage.text = "This message was deleted";
           lastMessage.image = null;
         }
 
+        // ✅ Get unread count for this group
+        const unreadCount = currentUser.getUnread(group._id.toString(), true);
+
         return {
           ...group,
           lastMessage: lastMessage || null,
+          unreadCount  // ✅ Include unread count in response
         };
       })
     );

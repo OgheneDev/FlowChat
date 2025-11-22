@@ -211,6 +211,9 @@ export const sendMessage = async (req, res) => {
 export const getChatPartners = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
+    
+    // ✅ Fetch the current user to access their unreadCounts
+    const currentUser = await User.findById(loggedInUserId);
 
     const messages = await Message.find({
       $or: [{ senderId: loggedInUserId }, { receiverId: loggedInUserId }],
@@ -242,7 +245,6 @@ export const getChatPartners = async (req, res) => {
             { senderId: loggedInUserId, receiverId: p._id },
             { senderId: p._id, receiverId: loggedInUserId },
           ],
-          // Only exclude messages deleted for the current user
           deletedFor: { $ne: loggedInUserId }
         })
           .populate("senderId", "fullName profilePic")
@@ -255,7 +257,14 @@ export const getChatPartners = async (req, res) => {
           .sort({ createdAt: -1 })
           .lean();
 
-        return { ...p, lastMessage: last || null };
+        // ✅ Get unread count for this chat partner
+        const unreadCount = currentUser.getUnread(p._id.toString(), false);
+
+        return { 
+          ...p, 
+          lastMessage: last || null,
+          unreadCount  // ✅ Include unread count in response
+        };
       })
     );
 
