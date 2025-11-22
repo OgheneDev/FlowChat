@@ -7,10 +7,12 @@ import { userSocketMap } from "../state.js";
 import sendPushNotification from "../../utils/pushNotificationHelpers.js";
 
 export const registerGroupMessageHandler = (io, socket, userName, userId) => {
+  
   socket.on(
     "sendGroupMessage", 
     async ({ groupId, text, image, replyTo }) => {
       log(`${userName} sending group message`, { groupId, text });
+      
       try {
         if (!groupId || (!text && !image)) {
           return socket.emit("error", {
@@ -44,6 +46,7 @@ export const registerGroupMessageHandler = (io, socket, userName, userId) => {
           }
         }
 
+        // ---------- CREATE MESSAGE ----------
         const newMsg = await Message.create({
           senderId: userId,
           groupId,
@@ -65,23 +68,27 @@ export const registerGroupMessageHandler = (io, socket, userName, userId) => {
         // Get all group members (excluding sender)
         const otherMembers = group.members.filter(m => m._id.toString() !== userId);
 
-        // ✅ INCREMENT UNREAD FOR OFFLINE MEMBERS
-        const offlineMembers = otherMembers.filter(member => 
-          !userSocketMap[member._id.toString()]
-        );
-
-        // Update unread counts for offline members in backend
-        for (const member of offlineMembers) {
+        // ✅ INCREMENT UNREAD FOR ALL OTHER MEMBERS (online and offline)
+        const memberUnreadCounts = {};
+        for (const member of otherMembers) {
           const memberUser = await User.findById(member._id);
           if (memberUser) {
-            await memberUser.incrementUnread(groupId, true); // true = isGroup
+            const newCount = await memberUser.incrementUnread(groupId, true); // true = isGroup
+            memberUnreadCounts[member._id.toString()] = newCount;
+            console.log(`📬 Incremented group unread for ${member.fullName}: ${newCount}`);
           }
         }
 
-        // ----- PUSH NOTIFICATIONS -----
+        // Separate online and offline members
+        const onlineMembers = otherMembers.filter(m => userSocketMap[m._id.toString()]);
+        const offlineMembers = otherMembers.filter(m => !userSocketMap[m._id.toString()]);
+
+        // ----- PUSH NOTIFICATIONS (only for offline) -----
         if (offlineMembers.length > 0) {
           try {
-            const messagePreview = text ? (text.length > 50 ? text.substring(0, 50) + '...' : text) : '📷 Photo';
+            const messagePreview = text 
+              ? (text.length > 50 ? text.substring(0, 50) + '...' : text) 
+              : '📷 Photo';
             
             for (const member of offlineMembers) {
               const activeTokens = member.deviceTokens?.map(device => device.token) || [];
@@ -109,28 +116,22 @@ export const registerGroupMessageHandler = (io, socket, userName, userId) => {
           }
         }
 
-        // Get online member socket IDs (excluding sender)
-        const onlineSockets = otherMembers
-          .filter((m) => userSocketMap[m._id.toString()])
-          .map((m) => userSocketMap[m._id.toString()]);
-
-        // Determine final status
-        const finalStatus = onlineSockets.length > 0 ? "delivered" : "sent";
+        // Determine final status based on online members
+        const finalStatus = onlineMembers.length > 0 ? "delivered" : "sent";
 
         // Update status in DB if delivered
         if (finalStatus === "delivered") {
           await Message.findByIdAndUpdate(newMsg._id, { status: "delivered" });
         }
 
-        // Send to each online member with their unread count from backend
-        for (const member of otherMembers) { 
+        // ----- SEND TO ONLINE MEMBERS -----
+        for (const member of onlineMembers) { 
           const memberId = member._id.toString();
           const memberSocketId = userSocketMap[memberId];
           
           if (memberSocketId) {
-            // ✅ GET UNREAD COUNT FROM BACKEND
-            const memberUser = await User.findById(memberId);
-            const unreadCount = memberUser ? memberUser.getUnread(groupId, true) : 0;
+            // Get unread count for this member
+            const unreadCount = memberUnreadCounts[memberId] || 0;
 
             // Send message to member
             io.to(memberSocketId).emit("newGroupMessage", {
@@ -139,7 +140,7 @@ export const registerGroupMessageHandler = (io, socket, userName, userId) => {
               status: "delivered",
             });
 
-            // ✅ SEND UNREAD COUNT FROM BACKEND
+            // ✅ SEND UNREAD COUNT TO MEMBER
             io.to(memberSocketId).emit("groupUnreadCountUpdated", {
               groupId: groupId,
               unreadCount: unreadCount
@@ -168,7 +169,7 @@ export const registerGroupMessageHandler = (io, socket, userName, userId) => {
     }
   );
 
-  // ✅ MARK GROUP MESSAGES AS SEEN - Now updates backend
+  // ✅ MARK GROUP MESSAGES AS SEEN
   socket.on("markGroupMessagesAsSeen", async ({ groupId }) => {
     try {
       // Update all group messages that aren't from this user to seen
@@ -187,7 +188,7 @@ export const registerGroupMessageHandler = (io, socket, userName, userId) => {
         await user.clearUnread(groupId, true); // true = isGroup
       }
 
-      // Emit unread count update to current user
+      // Emit unread count update to current user (confirm it's cleared)
       io.to(socket.id).emit("groupUnreadCountUpdated", {
         groupId: groupId,
         unreadCount: 0
@@ -213,6 +214,22 @@ export const registerGroupMessageHandler = (io, socket, userName, userId) => {
     } catch (err) {
       log("error", "markGroupMessagesAsSeen error", err);
       socket.emit("error", { message: "Server error marking group messages as seen" });
+    }
+  });
+
+  // ✅ JOIN GROUP ROOM
+  socket.on("groupAdded", ({ groupId }) => {
+    if (groupId) {
+      socket.join(`group:${groupId}`);
+      log("success", `${userName} joined group room: ${groupId}`);
+    }
+  });
+
+  // ✅ LEAVE GROUP ROOM
+  socket.on("leaveGroup", ({ groupId }) => {
+    if (groupId) {
+      socket.leave(`group:${groupId}`);
+      log("success", `${userName} left group room: ${groupId}`);
     }
   });
 };

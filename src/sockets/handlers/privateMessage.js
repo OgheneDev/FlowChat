@@ -18,6 +18,7 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
       console.log('🛣️ [DEBUG] Socket sendMessage called for user:', userName);
       console.log('🛣️ [DEBUG] Message text:', text?.substring(0, 50));
       log(`${userName} is sending a private message`, { receiverId, text });
+      
       try {
         if (!receiverId || (!text && !image)) {
           return socket.emit("error", {
@@ -51,7 +52,7 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
           }
         }
 
-        // ---------- CREATE ----------
+        // ---------- CREATE MESSAGE ----------
         const newMsg = await Message.create({
           senderId: userId,
           receiverId,
@@ -74,24 +75,24 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
         const receiverSocketId = userSocketMap[receiverId];
         console.log('🔌 [SOCKET] Socket Status for', receiverId, ':', receiverSocketId ? 'ONLINE' : 'OFFLINE');
         
-        // Determine initial status
         let finalStatus = "sent"; 
         
-        // ✅ INCREMENT UNREAD COUNT (Backend)
-        if (!receiverSocketId) {
-          // Receiver is offline - increment unread
-          await receiver.incrementUnread(userId, false);
-        }
+        // ✅ ALWAYS INCREMENT UNREAD COUNT ON BACKEND
+        // The frontend will clear it when the user views the chat
+        const newUnreadCount = await receiver.incrementUnread(userId, false);
+        console.log(`📬 Incremented unread for ${receiver.fullName}: ${newUnreadCount}`);
         
-        // ----- PUSH NOTIFICATION -----
+        // ----- PUSH NOTIFICATION (only for offline users) -----
         if (!receiverSocketId) {
           console.log('📤 [SOCKET] User is OFFLINE - attempting push notification');
           try {
             const receiverUser = await User.findById(receiverId).select('deviceTokens fullName');
-            const activeTokens = receiverUser.deviceTokens.map(device => device.token);
+            const activeTokens = receiverUser.deviceTokens?.map(device => device.token) || [];
             
             if (activeTokens.length > 0) {
-              const messagePreview = text ? (text.length > 50 ? text.substring(0, 50) + '...' : text) : '📷 Photo';
+              const messagePreview = text 
+                ? (text.length > 50 ? text.substring(0, 50) + '...' : text) 
+                : '📷 Photo';
               
               await sendPushNotification({
                 title: userName,
@@ -113,14 +114,11 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
           }
         }
         
-        // If receiver is online, send them the message and update status
+        // ----- ONLINE USER: Send message and unread count -----
         if (receiverSocketId) {
           // Update status to delivered in DB
           await Message.findByIdAndUpdate(newMsg._id, { status: "delivered" });
           finalStatus = "delivered";
-          
-          // ✅ GET CURRENT UNREAD COUNT
-          const unreadCount = receiver.getUnread(userId, false);
           
           // Send message to receiver
           io.to(receiverSocketId).emit("newMessage", {
@@ -134,10 +132,10 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
             lastMessage: { ...populated, status: "delivered" },
           });
           
-          // ✅ SEND UNREAD COUNT TO RECEIVER
+          // ✅ SEND UPDATED UNREAD COUNT TO RECEIVER
           io.to(receiverSocketId).emit("unreadCountUpdated", {
             chatId: userId,
-            unreadCount: unreadCount
+            unreadCount: newUnreadCount
           });
         }
         
@@ -161,7 +159,7 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
     }
   );
 
-  // ✅ MARK MESSAGES AS SEEN - Now updates backend
+  // ✅ MARK MESSAGES AS SEEN
   socket.on("markMessagesAsSeen", async ({ senderId }) => {
     try {
       // Update message status in DB
@@ -180,7 +178,7 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
         await user.clearUnread(senderId, false);
       }
 
-      // Emit unread count update to current user
+      // Emit unread count update to current user (confirm it's cleared)
       io.to(socket.id).emit("unreadCountUpdated", {
         chatId: senderId,
         unreadCount: 0
@@ -202,19 +200,32 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
     }
   });
 
-  // ✅ REQUEST UNREAD COUNTS - New handler
+  // ✅ REQUEST UNREAD COUNTS
   socket.on("requestUnreadCounts", async () => {
     try {
       const user = await User.findById(userId);
       if (user) {
-        // Convert Map to object for transmission
         const unreadCounts = {};
-        user.unreadCounts.forEach((count, chatId) => {
-          // Remove "group_" prefix for consistent frontend handling
-          const cleanId = chatId.startsWith('group_') ? chatId.substring(6) : chatId;
-          const isGroup = chatId.startsWith('group_');
-          unreadCounts[cleanId] = { count, isGroup };
-        });
+        
+        if (user.unreadCounts) {
+          if (user.unreadCounts instanceof Map) {
+            user.unreadCounts.forEach((count, chatId) => {
+              const cleanId = chatId.startsWith('group_') ? chatId.substring(6) : chatId;
+              const isGroup = chatId.startsWith('group_');
+              if (count > 0) {
+                unreadCounts[cleanId] = { count, isGroup };
+              }
+            });
+          } else if (typeof user.unreadCounts === 'object') {
+            Object.entries(user.unreadCounts).forEach(([chatId, count]) => {
+              const cleanId = chatId.startsWith('group_') ? chatId.substring(6) : chatId;
+              const isGroup = chatId.startsWith('group_');
+              if (count > 0) {
+                unreadCounts[cleanId] = { count, isGroup };
+              }
+            });
+          }
+        }
         
         socket.emit("allUnreadCounts", unreadCounts);
         log("success", `Sent unread counts to ${userName}`);
@@ -224,7 +235,7 @@ export const registerPrivateMessageHandler = (io, socket, userName, userId) => {
     }
   });
 
-  // Device token handlers (unchanged)
+  // Device token handlers
   socket.on("registerDeviceToken", async ({ token, deviceType = "web" }) => {
     try {
       const user = await User.findById(userId);
