@@ -1,8 +1,11 @@
 import express from "express"
 const router = express.Router();
 import { protect } from "../src/middleware/auth.middleware.js";
-import { getUserById } from "../src/controllers/user.controller.js";
+import { getUserById, getUnreadCounts } from "../src/controllers/user.controller.js";
 
-router.get("/:id", protect, getUserById);
+router.use(protect)
+
+router.get("/:id", getUserById);
+router.get("/unread-counts", getUnreadCounts)
 
 export const usersRouter = router;

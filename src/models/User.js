@@ -83,7 +83,7 @@ const userSchema = new mongoose.Schema(
     unreadCounts: {
       type: Map,
       of: Number,
-      default: new Map()
+      default: () => new Map()
     },
     // Map structure: { "chatPartnerId": count, "group_groupId": count }
   },
@@ -120,23 +120,42 @@ userSchema.methods.removeDeviceToken = function(token) {
   return this.save();
 };
 
-// ✅ NEW: Unread count methods
 userSchema.methods.incrementUnread = async function(chatId, isGroup = false) {
-  const key = isGroup ? `group_${chatId}` : chatId;
+  const key = isGroup ? `group_${chatId}` : String(chatId);
+  
+  // Ensure unreadCounts is initialized
+  if (!this.unreadCounts) {
+    this.unreadCounts = new Map();
+  }
+  
   const current = this.unreadCounts.get(key) || 0;
   this.unreadCounts.set(key, current + 1);
   await this.save();
+  
+  console.log(`📬 Incremented unread for ${key}: ${current + 1}`);
   return this.unreadCounts.get(key);
 };
 
 userSchema.methods.clearUnread = async function(chatId, isGroup = false) {
-  const key = isGroup ? `group_${chatId}` : chatId;
+  const key = isGroup ? `group_${chatId}` : String(chatId);
+  
+  if (!this.unreadCounts) {
+    this.unreadCounts = new Map();
+  }
+  
   this.unreadCounts.set(key, 0);
   await this.save();
+  
+  console.log(`📬 Cleared unread for ${key}`);
 };
 
 userSchema.methods.getUnread = function(chatId, isGroup = false) {
-  const key = isGroup ? `group_${chatId}` : chatId;
+  const key = isGroup ? `group_${chatId}` : String(chatId);
+  
+  if (!this.unreadCounts) {
+    return 0;
+  }
+  
   return this.unreadCounts.get(key) || 0;
 };
 
