@@ -62,7 +62,7 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }));
   app.use("/api/dev", devRouter);
   app.use("/api/users", usersRouter);
   app.use("/api/notifications", notificationsRouter);
-  
+   
 
   // Swagger route
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));

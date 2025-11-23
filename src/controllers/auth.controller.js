@@ -86,8 +86,9 @@ export const logout = async (_, res) => {
     res.cookie("jwt", "", { 
         maxAge: 0,
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'none'
+        secure: true, // CHANGED: Always true for production
+        sameSite: 'none',
+        path: '/', // Must match the path used when setting the cookie
     });
     res.status(200).json({ message: "Logged out successfully" });
 };
@@ -261,8 +262,14 @@ export const deleteAccount = async (req, res, next) => {
         // Delete user
         await User.findByIdAndDelete(req.user._id);
 
-        // Optional: Clear cookie
-        res.cookie("jwt", "", { maxAge: 0 });
+        // Clear cookie with same settings as when it was set
+        res.cookie("jwt", "", { 
+            maxAge: 0,
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none',
+            path: '/',
+        });
 
         res.status(200).json({
             success: true,

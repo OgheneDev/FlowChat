@@ -9,7 +9,8 @@ export const generateToken = (userId, res) => {
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     httpOnly: true,
     sameSite: "none", // cross-site cookie allowed
-    secure: process.env.NODE_ENV !== "development", // true on Render
+    secure: true, // CHANGED: Always true for production (Render uses HTTPS)
+    path: '/', // Ensure cookie is available on all paths
   });
 
   return token;
