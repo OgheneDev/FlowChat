@@ -283,9 +283,11 @@ export const getMessageById = async (req, res) => {
       return res.status(400).json({ message: "Message ID is required" });
     }
 
-    // Find the message and populate sender information
+    // Find the message and populate all necessary information
     const message = await Message.findById(messageId)
       .populate('senderId', 'fullName profilePic email')
+      .populate('receiverId', 'fullName profilePic email') // Add receiver population
+      .populate('groupId', 'name members') // Add group population
       .populate('replyTo', 'text image senderId')
       .lean();
 
@@ -298,10 +300,40 @@ export const getMessageById = async (req, res) => {
       id: message._id,
       text: message.text?.substring(0, 50) + (message.text?.length > 50 ? '...' : ''),
       hasImage: !!message.image,
-      sender: message.senderId?.fullName || 'Unknown'
+      sender: message.senderId?.fullName || 'Unknown',
+      receiver: message.receiverId?.fullName || 'None',
+      group: message.groupId?.name || 'None'
     });
 
-    // Format the response to match your frontend expectations
+    // For private messages, determine the chat partner
+    let chatPartnerId = null;
+    let chatPartnerDetails = null;
+    
+    if (message.groupId) {
+      // It's a group message
+      console.log("📱 Group message detected");
+    } else if (message.receiverId) {
+      // It's a private message - determine the other user
+      const currentUserId = userId.toString();
+      const senderId = message.senderId?._id?.toString();
+      const receiverId = message.receiverId?._id?.toString();
+      
+      console.log("💬 Private message - Current:", currentUserId, "Sender:", senderId, "Receiver:", receiverId);
+      
+      if (senderId === currentUserId) {
+        // Current user is sender, so partner is receiver
+        chatPartnerId = receiverId;
+        chatPartnerDetails = message.receiverId;
+        console.log("👤 Chat partner is receiver:", chatPartnerDetails?.fullName);
+      } else {
+        // Current user is receiver, so partner is sender
+        chatPartnerId = senderId;
+        chatPartnerDetails = message.senderId;
+        console.log("👤 Chat partner is sender:", chatPartnerDetails?.fullName);
+      }
+    }
+
+    // Format the response to include chat context
     const formattedMessage = {
       _id: message._id,
       text: message.text,
@@ -315,6 +347,24 @@ export const getMessageById = async (req, res) => {
         fullName: message.senderId.fullName,
         profilePic: message.senderId.profilePic,
         email: message.senderId.email
+      } : null,
+      receiverId: message.receiverId ? {
+        _id: message.receiverId._id,
+        fullName: message.receiverId.fullName,
+        profilePic: message.receiverId.profilePic,
+        email: message.receiverId.email
+      } : null,
+      groupId: message.groupId ? {
+        _id: message.groupId._id,
+        name: message.groupId.name,
+        members: message.groupId.members
+      } : null,
+      // Add chatPartnerId for easy frontend consumption
+      chatPartnerId: chatPartnerId ? {
+        _id: chatPartnerId,
+        fullName: chatPartnerDetails?.fullName,
+        profilePic: chatPartnerDetails?.profilePic,
+        email: chatPartnerDetails?.email
       } : null,
       replyTo: message.replyTo ? {
         _id: message.replyTo._id,
@@ -339,7 +389,7 @@ export const getMessageById = async (req, res) => {
 export const getMessagesByIds = async (req, res) => {
   try {
     console.log("📨 === getMessagesByIds START ===");
-    let { messageIds } = req.body;
+    const { messageIds } = req.body;
     const userId = req.user._id;
 
     console.log("Fetching messages:", messageIds, "for user:", userId);
@@ -348,56 +398,87 @@ export const getMessagesByIds = async (req, res) => {
       return res.status(400).json({ message: "Message IDs array is required" });
     }
 
-    // Handle case where messageIds might be objects with _id property
-    const actualMessageIds = messageIds.map(id => {
-      if (typeof id === 'string') {
-        return id;
-      } else if (id && id._id) {
-        return id._id;
-      } else {
-        console.error("Invalid message ID format:", id);
-        return null;
-      }
-    }).filter(Boolean);
-
-    console.log("Processed message IDs:", actualMessageIds);
-
-    // Find all messages and populate sender information
-    const messages = await Message.find({ _id: { $in: actualMessageIds } })
+    // Find messages and populate all necessary information
+    const messages = await Message.find({ _id: { $in: messageIds } })
       .populate('senderId', 'fullName profilePic email')
+      .populate('receiverId', 'fullName profilePic email')
+      .populate('groupId', 'name members')
       .populate('replyTo', 'text image senderId')
-      .lean()
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     console.log(`✅ Found ${messages.length} messages`);
 
-    // Format the responses
-    const formattedMessages = messages.map(message => ({
-      _id: message._id,
-      text: message.text,
-      image: message.image,
-      createdAt: message.createdAt,
-      updatedAt: message.updatedAt,
-      editedAt: message.editedAt,
-      status: message.status,
-      senderId: message.senderId ? {
-        _id: message.senderId._id,
-        fullName: message.senderId.fullName,
-        profilePic: message.senderId.profilePic,
-        email: message.senderId.email
-      } : null,
-      replyTo: message.replyTo ? {
-        _id: message.replyTo._id,
-        text: message.replyTo.text,
-        image: message.replyTo.image,
-        senderId: message.replyTo.senderId
-      } : null
-    }));
+    // Format each message with chat context
+    const formattedMessages = messages.map(message => {
+      // For private messages, determine the chat partner
+      let chatPartnerId = null;
+      let chatPartnerDetails = null;
+      
+      if (message.groupId) {
+        // It's a group message
+      } else if (message.receiverId) {
+        // It's a private message - determine the other user
+        const currentUserId = userId.toString();
+        const senderId = message.senderId?._id?.toString();
+        const receiverId = message.receiverId?._id?.toString();
+        
+        if (senderId === currentUserId) {
+          // Current user is sender, so partner is receiver
+          chatPartnerId = receiverId;
+          chatPartnerDetails = message.receiverId;
+        } else {
+          // Current user is receiver, so partner is sender
+          chatPartnerId = senderId;
+          chatPartnerDetails = message.senderId;
+        }
+      }
+
+      return {
+        _id: message._id,
+        text: message.text,
+        image: message.image,
+        createdAt: message.createdAt,
+        updatedAt: message.updatedAt,
+        editedAt: message.editedAt,
+        status: message.status,
+        senderId: message.senderId ? {
+          _id: message.senderId._id,
+          fullName: message.senderId.fullName,
+          profilePic: message.senderId.profilePic,
+          email: message.senderId.email
+        } : null,
+        receiverId: message.receiverId ? {
+          _id: message.receiverId._id,
+          fullName: message.receiverId.fullName,
+          profilePic: message.receiverId.profilePic,
+          email: message.receiverId.email
+        } : null,
+        groupId: message.groupId ? {
+          _id: message.groupId._id,
+          name: message.groupId.name,
+          members: message.groupId.members
+        } : null,
+        // Add chatPartnerId for easy frontend consumption
+        chatPartnerId: chatPartnerId ? {
+          _id: chatPartnerId,
+          fullName: chatPartnerDetails?.fullName,
+          profilePic: chatPartnerDetails?.profilePic,
+          email: chatPartnerDetails?.email
+        } : null,
+        replyTo: message.replyTo ? {
+          _id: message.replyTo._id,
+          text: message.replyTo.text,
+          image: message.replyTo.image,
+          senderId: message.replyTo.senderId
+        } : null
+      };
+    });
 
     console.log("📨 === getMessagesByIds END ===");
 
     res.status(200).json({
-      message: "Messages details fetched successfully",
+      message: "Messages fetched successfully",
       messages: formattedMessages
     });
   } catch (err) {
@@ -406,9 +487,6 @@ export const getMessagesByIds = async (req, res) => {
   }
 };
 
-/* -------------------------------------------------
-   2. STAR MESSAGE / CHAT (unchanged, just cleaned)
-   ------------------------------------------------- */
 export const toggleStarMessage = async (req, res) => {
   try {
     const { messageId } = req.body;
