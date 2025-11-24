@@ -35,13 +35,12 @@ export const signup = async (req, res) => {
         // Generate token and set cookie
         const token = generateToken(savedUser._id, res);
 
-        // IMPORTANT: Also return token in response body for iOS Safari
         res.status(201).json({
             _id: savedUser._id,
             fullName: savedUser.fullName,
             email: savedUser.email,
             profilePic: savedUser.profilePic,
-            token: token // Added for iOS Safari
+            token: token
         });
 
         try {
@@ -73,13 +72,12 @@ export const login = async (req, res) => {
         // Generate token and set cookie
         const token = generateToken(user._id, res);
 
-        // IMPORTANT: Also return token in response body for iOS Safari
         res.status(200).json({
             _id: user._id,
             fullName: user.fullName,
             email: user.email,
             profilePic: user.profilePic,
-            token: token // Added for iOS Safari
+            token: token
         });
 
     } catch (error) {
